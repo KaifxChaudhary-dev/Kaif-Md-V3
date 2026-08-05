@@ -1,7 +1,5 @@
 # 🤖 Kaif-Md-V3 🤖
-### Developed by [Kaif (ixxkaif)](https://github.com/ixxkaif) & [KaifxChaudhary-dev](https://github.com/KaifxChaudhary-dev)
-
-[![Heroku Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/KaifxChaudhary-dev/Kaif-Md)
+### Developed by [KaifxChaudhary-dev](https://github.com/KaifxChaudhary-dev)
 
 A powerful, light, and high-performance WhatsApp bot focused on **Auto-Forwarding**, **Session Security**, and **Core Utilities**.
 
