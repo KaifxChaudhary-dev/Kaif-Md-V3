@@ -1,7 +1,12 @@
-﻿{
+{
   "name": "Kaif-Md-V3",
   "description": "WhatsApp Bot with Auto Forward Features",
-  "keywords": ["whatsapp", "bot", "kaif", "mongodb"],
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "kaif",
+    "mongodb"
+  ],
   "repository": "https://github.com/KaifxChaudhary-dev/Kaif-Md",
   "logo": "https://i.ibb.co/d6bLQ7y/whatsapp-logo.png",
   "success_url": "/",
@@ -20,6 +25,9 @@
   "buildpacks": [
     {
       "url": "heroku-community/apt"
+    },
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
     },
     {
       "url": "heroku/nodejs"
