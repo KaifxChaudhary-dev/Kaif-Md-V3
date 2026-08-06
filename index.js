@@ -25,7 +25,12 @@ const isNoisyLog = (msg) => {
         msg.includes('Closing session: SessionEntry') ||
         msg.includes('Failed to decrypt message') ||
         msg.includes('Decrypted message with closed session') ||
-        msg.includes('Closing open session in favor of incoming prekey bundle')
+        msg.includes('Closing open session in favor of incoming prekey bundle') ||
+        msg.includes('registrationId:') ||
+        msg.includes('currentRatchet:') ||
+        msg.includes('ephemeralKeyPair:') ||
+        msg.includes('indexInfo:') ||
+        msg.includes('pendingPreKey:')
     );
 };
 
