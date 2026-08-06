@@ -389,11 +389,20 @@ async function startSession(sessionId) {
         for (const kaif_msg of kaif_m.messages) {
             if (!kaif_msg || !kaif_msg.message) continue;
 
-            const kaif_origin = kaif_msg.key.remoteJid;
+            let kaif_origin = kaif_msg.key.remoteJid;
             const botJid = kaif_sock.user?.id ? jidNormalizedUser(kaif_sock.user.id) : '';
             const kaif_sender = kaif_msg.key.fromMe
                 ? botJid
                 : jidNormalizedUser(kaif_msg.key.participant || kaif_origin);
+
+            // Safely normalize WhatsApp Privacy LID JIDs (@lid) to deliverable phone JIDs (@s.whatsapp.net)
+            if (kaif_origin && kaif_origin.endsWith('@lid')) {
+                if (kaif_msg.key.fromMe) {
+                    kaif_origin = botJid || kaif_origin;
+                } else {
+                    kaif_origin = (kaif_sender && kaif_sender.endsWith('@s.whatsapp.net')) ? kaif_sender : kaif_origin;
+                }
+            }
 
             const realMsg = unwrapMessage(kaif_msg.message);
 
