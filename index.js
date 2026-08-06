@@ -495,12 +495,20 @@ async function startSession(sessionId) {
                 } catch (e) {}
             }
             
-            // 1. GLOBAL AUTO FORWARD LOGIC (High speed RAM cache)
-            if (kaif_origin.endsWith('@g.us') && !kaif_msg.key.fromMe) {
-                try {
-                    const globalCfg = await kaif_getGlobalAutoForward(sessionId);
-                    if (globalCfg?.enabled && globalCfg.sourceJids?.includes(kaif_origin) && globalCfg.targetJids?.length > 0) {
+            // 1. GLOBAL AUTO FORWARD LOGIC
+            try {
+                const globalCfg = await kaif_getGlobalAutoForward(sessionId);
+                if (globalCfg?.enabled && globalCfg.targetJids?.length > 0) {
+                    const isSourceMatched = (!globalCfg.sourceJids || globalCfg.sourceJids.length === 0) ||
+                        globalCfg.sourceJids.some(s => {
+                            if (!s) return false;
+                            if (s === kaif_origin) return true;
+                            const sDigits = s.replace(/\D/g, '');
+                            const oDigits = kaif_origin.replace(/\D/g, '');
+                            return sDigits && oDigits && sDigits === oDigits;
+                        });
 
+                    if (isSourceMatched) {
                         let customRegexList = [];
                         if (globalCfg.oldTextRegex && Array.isArray(globalCfg.oldTextRegex)) {
                             customRegexList = globalCfg.oldTextRegex.map(pattern => {
@@ -533,20 +541,22 @@ async function startSession(sessionId) {
                             }
 
                             for (const targetJid of globalCfg.targetJids) {
+                                if (targetJid === kaif_origin) continue; // Prevent loop back to source
                                 try {
                                     await kaif_sock.relayMessage(targetJid, relayMsg, {
                                         messageId: kaif_sock.generateMessageTag()
                                     });
-                                    await new Promise(r => setTimeout(r, 50));
+                                    console.log(`🚀 [GLOBAL-FORWARD] Forwarded message from ${kaif_origin} to ${targetJid}`);
+                                    await new Promise(r => setTimeout(r, 100));
                                 } catch (err) {
                                     console.error(`[GLOBAL-FORWARD] Failed for ${targetJid}:`, err.message);
                                 }
                             }
                         }
                     }
-                } catch (err) {
-                    console.error('[GLOBAL-FORWARD] Error:', err.message);
                 }
+            } catch (err) {
+                console.error('[GLOBAL-FORWARD] Error:', err.message);
             }
 
             // 3. COMMAND HANDLER
