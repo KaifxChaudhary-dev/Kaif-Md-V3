@@ -7,6 +7,14 @@ try { dns.setServers(['8.8.8.8', '1.1.1.1']); } catch (e) {}
  */
 require('dotenv').config();
 
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ Uncaught Exception:', err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
+});
+
 // Filter out noisy libsignal decryption/Bad MAC console spam
 const originalConsoleError = console.error;
 console.error = function (...args) {

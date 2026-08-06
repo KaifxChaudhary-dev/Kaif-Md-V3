@@ -17,14 +17,31 @@ async function kaif_connectSession(usePairingCode = false, customSessionId = nul
     console.log(`🔌 Connecting to session: ${sessionId}`);
 
     let state, saveCreds;
+    let usedMongo = false;
 
-    // Always prefer MongoDB auth state when mongoDbUrl is provided so Heroku dynos persist sessions
     if (config.mongoDbUrl) {
-        console.log(`💾 Using MongoDB session storage for: ${sessionId}`);
-        const auth = await useMongoDBAuthState(sessionId);
-        state = auth.state;
-        saveCreds = auth.saveCreds;
-    } else {
+        if (mongoose.connection.readyState !== 1) {
+            let waitCount = 0;
+            while (mongoose.connection.readyState !== 1 && waitCount < 10) {
+                await new Promise(r => setTimeout(r, 500));
+                waitCount++;
+            }
+        }
+
+        if (mongoose.connection.readyState === 1) {
+            try {
+                console.log(`💾 Using MongoDB session storage for: ${sessionId}`);
+                const auth = await useMongoDBAuthState(sessionId);
+                state = auth.state;
+                saveCreds = auth.saveCreds;
+                usedMongo = true;
+            } catch (e) {
+                console.error(`⚠️ MongoDB Auth State initialization error: ${e.message}`);
+            }
+        }
+    }
+
+    if (!usedMongo) {
         console.log(`📁 Using local multi-file session storage for: ${sessionId}`);
         const sessionPath = path.join(process.cwd(), sessionId);
         const auth = await useMultiFileAuthState(sessionPath);
@@ -77,7 +94,7 @@ async function kaif_requestPairingCode(kaif_sock, phoneNumber) {
 async function kaif_clearSession(customSessionId = null) {
     const sessionId = customSessionId || config.sessionId || 'kaif_session';
 
-    if (config.mongoDbUrl) {
+    if (config.mongoDbUrl && mongoose.connection.readyState === 1) {
         try {
             const { useMongoDBAuthState } = require('./mongoAuth');
             const { clearState } = await useMongoDBAuthState(sessionId);
