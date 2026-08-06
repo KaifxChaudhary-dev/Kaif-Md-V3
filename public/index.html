@@ -399,13 +399,40 @@
                 </div>
             </div>
 
+            <!-- Connection Status -->
+            <div class="section-title"><i class="fas fa-plug"></i> WhatsApp Linking Mode</div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                <button id="btnTabQr" class="tab-btn active" onclick="switchLinkTab('qr')" style="flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--accent); background: rgba(37,211,102,0.15); color: #fff; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+                    <i class="fas fa-qrcode"></i> Scan QR Code
+                </button>
+                <button id="btnTabPair" class="tab-btn" onclick="switchLinkTab('pair')" style="flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-sub); cursor: pointer; font-weight: 600; transition: all 0.2s;">
+                    <i class="fas fa-mobile-screen-button"></i> Pairing Code
+                </button>
+            </div>
+
             <!-- QR Code Section -->
-            <div class="section-title"><i class="fas fa-qrcode"></i> Connection Status</div>
             <div class="qr-section" id="qrContainer">
                 <div class="no-qr">
                     <i class="fas fa-spinner fa-spin" style="font-size: 32px;"></i>
                     <span>Initializing connection...</span>
                 </div>
+            </div>
+
+            <!-- Pairing Code Section -->
+            <div id="pairContainer" style="display: none; background: rgba(0,0,0,0.25); padding: 20px; border-radius: 16px; border: 1px solid var(--card-border); margin-bottom: 24px;">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 13px; font-weight: 600; color: var(--text-sub);">
+                        <i class="fas fa-phone" style="color: #25d366;"></i> WhatsApp Phone Number (with Country Code)
+                    </label>
+                    <div style="display: flex; gap: 10px; margin-top: 6px;">
+                        <input type="text" id="pairPhoneNumber" class="form-control" placeholder="e.g. 923453684061" style="flex: 1; font-size: 15px; letter-spacing: 0.5px;">
+                        <button class="btn-save" onclick="getPairingCode()" id="btnGetPairCode" style="padding: 0 24px; width: auto; margin-top: 0; white-space: nowrap;">
+                            <i class="fas fa-key"></i> Get Code
+                        </button>
+                    </div>
+                </div>
+                <div id="pairCodeDisplay"></div>
             </div>
 
             <!-- Feature Toggles -->
@@ -715,6 +742,106 @@
             } catch (e) {
                 console.error('Status error:', e);
             }
+        }
+
+        let activeLinkTab = 'qr';
+
+        function switchLinkTab(tab) {
+            activeLinkTab = tab;
+            const btnQr = document.getElementById('btnTabQr');
+            const btnPair = document.getElementById('btnTabPair');
+            const qrBox = document.getElementById('qrContainer');
+            const pairBox = document.getElementById('pairContainer');
+
+            if (tab === 'qr') {
+                btnQr.style.border = '1px solid var(--accent)';
+                btnQr.style.background = 'rgba(37,211,102,0.15)';
+                btnQr.style.color = '#fff';
+
+                btnPair.style.border = '1px solid var(--card-border)';
+                btnPair.style.background = 'var(--input-bg)';
+                btnPair.style.color = 'var(--text-sub)';
+
+                qrBox.style.display = 'block';
+                pairBox.style.display = 'none';
+            } else {
+                btnPair.style.border = '1px solid var(--accent)';
+                btnPair.style.background = 'rgba(37,211,102,0.15)';
+                btnPair.style.color = '#fff';
+
+                btnQr.style.border = '1px solid var(--card-border)';
+                btnQr.style.background = 'var(--input-bg)';
+                btnQr.style.color = 'var(--text-sub)';
+
+                qrBox.style.display = 'none';
+                pairBox.style.display = 'block';
+            }
+        }
+
+        async function getPairingCode() {
+            const phoneInput = document.getElementById('pairPhoneNumber');
+            const btn = document.getElementById('btnGetPairCode');
+            const display = document.getElementById('pairCodeDisplay');
+            const number = phoneInput.value.trim();
+
+            if (!number) {
+                display.innerHTML = '<span style="color: #ff4d4d; font-size: 13px;"><i class="fas fa-circle-exclamation"></i> Please enter your WhatsApp number (e.g. 923453684061)</span>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Requesting...';
+            display.innerHTML = '<span style="color: #f59e0b; font-size: 13px;"><i class="fas fa-spinner fa-spin"></i> Requesting pairing code from WhatsApp...</span>';
+
+            try {
+                const res = await fetch('/api/pairing-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber: number })
+                });
+
+                const data = await res.json();
+                if (data.success && data.pairingCode) {
+                    renderPairingCodeCard(data.pairingCode);
+                } else {
+                    display.innerHTML = '<span style="color: #ff4d4d; font-size: 13px;"><i class="fas fa-circle-exclamation"></i> ' + (data.error || 'Failed to get code') + '</span>';
+                }
+            } catch (e) {
+                display.innerHTML = '<span style="color: #ff4d4d; font-size: 13px;"><i class="fas fa-circle-exclamation"></i> Network error generating pairing code</span>';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-key"></i> Get Code';
+            }
+        }
+
+        function renderPairingCodeCard(code) {
+            const display = document.getElementById('pairCodeDisplay');
+            display.innerHTML = `
+                <div style="background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.3); border-radius: 14px; padding: 16px; margin-top: 10px; text-align: center;">
+                    <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 6px;">YOUR WHATSAPP PAIRING CODE</div>
+                    <div style="font-size: 28px; font-weight: 800; letter-spacing: 4px; color: #25d366; font-family: monospace; text-shadow: 0 0 10px rgba(37,211,102,0.3); margin: 6px 0;" id="pairingCodeVal">${code}</div>
+                    <button onclick="copyPairingCode('${code}')" style="background: #25d366; color: #000; font-weight: 700; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s; margin-top: 6px;">
+                        <i class="fas fa-copy"></i> Copy Code
+                    </button>
+                    <div style="margin-top: 12px; font-size: 12px; color: var(--text-sub); text-align: left; background: rgba(0,0,0,0.2); padding: 10px 14px; border-radius: 8px;">
+                        <strong><i class="fas fa-info-circle" style="color: #3b82f6;"></i> How to link:</strong><br>
+                        1. Open WhatsApp on your phone.<br>
+                        2. Tap <strong>Settings / Menu (?)</strong> > <strong>Linked Devices</strong>.<br>
+                        3. Tap <strong>Link a Device</strong> > <strong>Link with phone number instead</strong>.<br>
+                        4. Enter the code shown above.
+                    </div>
+                </div>
+            `;
+        }
+
+        function copyPairingCode(code) {
+            navigator.clipboard.writeText(code).then(() => {
+                const display = document.getElementById('configMessage');
+                display.innerHTML = '<span style="color: #25d366; background: rgba(37,211,102,0.1); padding: 8px 16px; border-radius: 100px; display: inline-block;"><i class="fas fa-check"></i> Pairing code copied to clipboard!</span>';
+                setTimeout(() => { display.innerHTML = ''; }, 3000);
+            }).catch(() => {
+                alert('Code: ' + code);
+            });
         }
 
         loadConfig();

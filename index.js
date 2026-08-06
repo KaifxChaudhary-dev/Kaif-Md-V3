@@ -136,8 +136,51 @@ kaif_app.get('/api/status', async (req, res) => {
         sessionId: config.sessionId,
         connected: session?.isConnected || false,
         qr: session?.qr || null,
+        pairingCode: session?.pairingCode || null,
         dbConnected: kaif_isDbConnected()
     });
+});
+
+kaif_app.post('/api/pairing-code', async (req, res) => {
+    try {
+        const sessionId = config.sessionId || 'kaif_session';
+        const session = sessions.get(sessionId);
+
+        if (!session || !session.sock) {
+            return res.status(400).json({ success: false, error: 'Session not initialized yet. Please refresh the page.' });
+        }
+
+        if (session.isConnected || session.sock.authState?.creds?.registered) {
+            return res.status(400).json({ success: false, error: 'WhatsApp is already connected!' });
+        }
+
+        const { phoneNumber } = req.body;
+        if (!phoneNumber) {
+            return res.status(400).json({ success: false, error: 'Please enter your phone number.' });
+        }
+
+        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+        if (!cleanNumber || cleanNumber.length < 7 || cleanNumber.length > 15) {
+            return res.status(400).json({ success: false, error: 'Invalid phone number format. Please include country code (e.g. 923453684061).' });
+        }
+
+        console.log(`?? Requesting pairing code for [${sessionId}] number: ${cleanNumber}`);
+        const codeStr = await session.sock.requestPairingCode(cleanNumber);
+        const formattedCode = (codeStr && typeof codeStr === 'string')
+            ? (codeStr.includes('-') ? codeStr : (codeStr.match(/.{1,4}/g)?.join('-') || codeStr))
+            : codeStr;
+
+        session.pairingCode = formattedCode;
+
+        res.json({
+            success: true,
+            pairingCode: formattedCode,
+            message: 'Pairing code generated successfully!'
+        });
+    } catch (e) {
+        console.error('Pairing code generation error:', e.message);
+        res.status(500).json({ success: false, error: e.message || 'Failed to generate pairing code' });
+    }
 });
 
 kaif_app.get('/api/config', async (req, res) => {
@@ -256,7 +299,7 @@ async function startSession(sessionId) {
     }
 
     console.log(`📡 Starting session: ${sessionId}`);
-    const sessionState = { sock: null, isConnected: false, qr: null };
+    const sessionState = { sock: null, isConnected: false, qr: null, pairingCode: null };
     sessions.set(sessionId, sessionState);
 
     const { kaif_sock, saveCreds } = await kaif_connectSession(false, sessionId);
@@ -279,6 +322,7 @@ async function startSession(sessionId) {
         if (connection === 'close') {
             sessionState.isConnected = false;
             sessionState.qr = null;
+            sessionState.pairingCode = null;
             const statusCode = (lastDisconnect?.error instanceof Boom) ?
                 lastDisconnect.error.output.statusCode : 500;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 440;
@@ -293,6 +337,7 @@ async function startSession(sessionId) {
         } else if (connection === 'open') {
             sessionState.isConnected = true;
             sessionState.qr = null;
+            sessionState.pairingCode = null;
             console.log(`✅ ${sessionId}: Connected to WhatsApp`);
         }
     });
