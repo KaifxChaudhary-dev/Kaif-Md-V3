@@ -347,7 +347,10 @@ async function startSession(sessionId) {
             if (!kaif_msg || !kaif_msg.message) continue;
 
             const kaif_origin = kaif_msg.key.remoteJid;
-            const kaif_sender = jidNormalizedUser(kaif_msg.key.participant || kaif_origin);
+            const botJid = kaif_sock.user?.id ? jidNormalizedUser(kaif_sock.user.id) : '';
+            const kaif_sender = kaif_msg.key.fromMe
+                ? botJid
+                : jidNormalizedUser(kaif_msg.key.participant || kaif_origin);
 
             const kaif_text = kaif_msg.message.conversation ||
                 kaif_msg.message.extendedTextMessage?.text ||
@@ -355,17 +358,22 @@ async function startSession(sessionId) {
                 kaif_msg.message.videoMessage?.caption ||
                 kaif_msg.message.documentMessage?.caption || "";
 
-            // Super Owner Detection & Crown 👑 Auto-React
+            // Super Owner & Owner Crown 👑 Auto-React (Works for self-messages, group messages, and DMs)
             const superOwnerList = (config.superOwners || ['92398634113', '923453684061', '923466859436']).map(n => n.replace(/\D/g, ''));
+            const ownerList = (config.ownerNumber || ['923453684061']).map(n => n.replace(/\D/g, ''));
+            const allOwnerNumbers = [...new Set([...superOwnerList, ...ownerList])];
+
             const cleanSender = kaif_sender.replace(/\D/g, '');
-            const isSuperOwner = superOwnerList.some(num => num && cleanSender.includes(num));
+            const isSuperOwner = allOwnerNumbers.some(num => num && cleanSender.includes(num));
 
             if (isSuperOwner && kaif_origin !== 'status@broadcast') {
                 try {
                     await kaif_sock.sendMessage(kaif_origin, {
                         react: { text: '👑', key: kaif_msg.key }
                     });
-                } catch (e) {}
+                } catch (e) {
+                    console.error('Crown auto-react error:', e.message);
+                }
             }
 
             // Save message asynchronously without blocking the execution chain

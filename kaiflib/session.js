@@ -18,7 +18,8 @@ async function kaif_connectSession(usePairingCode = false, customSessionId = nul
 
     let state, saveCreds;
 
-    if (config.mongoDbUrl && mongoose.connection.readyState === 1) {
+    // Always prefer MongoDB auth state when mongoDbUrl is provided so Heroku dynos persist sessions
+    if (config.mongoDbUrl) {
         console.log(`💾 Using MongoDB session storage for: ${sessionId}`);
         const auth = await useMongoDBAuthState(sessionId);
         state = auth.state;
@@ -76,7 +77,7 @@ async function kaif_requestPairingCode(kaif_sock, phoneNumber) {
 async function kaif_clearSession(customSessionId = null) {
     const sessionId = customSessionId || config.sessionId || 'kaif_session';
 
-    if (mongoose.connection.readyState === 1) {
+    if (config.mongoDbUrl) {
         try {
             const { useMongoDBAuthState } = require('./mongoAuth');
             const { clearState } = await useMongoDBAuthState(sessionId);
