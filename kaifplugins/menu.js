@@ -9,9 +9,8 @@ module.exports = {
     category: 'Information',
     desc: 'Show all available commands',
     kaif_handler: async (kaif_sock, kaif_origin, context) => {
-        const { kaif_plugins, kaif_sender } = context;
+        const { kaif_plugins, kaif_sender, kaif_msg } = context;
         
-        // Group commands by category (avoiding duplicates from aliases)
         const categories = {};
         const handledCommands = new Set();
         
@@ -24,8 +23,7 @@ module.exports = {
             categories[category].push(plugin);
         }
 
-        // Build the Menu String
-        let menuText = `* ⚡ KAIF-MD-V3 ⚡*\n\n`;
+        let menuText = `⚡ *KAIF-MD-V3 OFFICIAL MENU* ⚡\n\n`;
         menuText += `👤 *User:* @${kaif_sender.split('@')[0]}\n`;
         menuText += `📌 *Prefix:* .\n`;
         menuText += `⚙️ *Commands:* ${handledCommands.size}\n`;
@@ -41,9 +39,13 @@ module.exports = {
         
         menuText += `> _Developed by Kaif x Chaudhary • Contact: wa.me/923453684061_`;
 
-        await kaif_sock.sendMessage(kaif_origin, { 
-            text: menuText,
-            mentions: [kaif_sender]
-        });
+        try {
+            return await kaif_sock.sendMessage(kaif_origin, { 
+                text: menuText,
+                mentions: kaif_sender.endsWith('@s.whatsapp.net') ? [kaif_sender] : []
+            }, { quoted: kaif_msg });
+        } catch (e) {
+            return await kaif_sock.sendMessage(kaif_origin, { text: menuText });
+        }
     }
 };

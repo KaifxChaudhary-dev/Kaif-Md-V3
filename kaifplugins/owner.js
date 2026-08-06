@@ -44,13 +44,15 @@ module.exports = {
                     displayName: 'Kaif x Chaudhary',
                     contacts: [{ vcard }]
                 }
-            }, { quoted: kaif_msg });
+            });
         } catch (e) {}
 
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 200));
 
-        return await kaif_sock.sendMessage(kaif_origin, {
-            text: ownerText
-        }, { quoted: kaif_msg });
+        try {
+            return await kaif_sock.sendMessage(kaif_origin, { text: ownerText }, { quoted: kaif_msg });
+        } catch (e) {
+            return await kaif_sock.sendMessage(kaif_origin, { text: ownerText });
+        }
     }
 };

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Ping Command
  * Developed by Kaif (ixxkaif)
@@ -16,8 +16,10 @@ module.exports = {
         report += `📡 *Server Latency:* ${incomingLatency}ms\n\n`;
         report += `📞 *Contact Us:* wa.me/923453684061 (+923453684061)`;
 
-        return await kaif_sock.sendMessage(kaif_origin, { 
-            text: report 
-        }, { quoted: kaif_msg });
+        try {
+            return await kaif_sock.sendMessage(kaif_origin, { text: report }, { quoted: kaif_msg });
+        } catch (e) {
+            return await kaif_sock.sendMessage(kaif_origin, { text: report });
+        }
     }
 };
