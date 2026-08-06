@@ -1,5 +1,5 @@
-/**
- * ? KAIF-MD-V3 ?
+﻿/**
+ * ⚡ KAIF-MD-V3 ⚡
  * Owner Information Command
  * Developed by Kaif (ixxkaif)
  */
@@ -11,21 +11,21 @@ module.exports = {
     kaif_handler: async (kaif_sock, kaif_origin, context) => {
         const { kaif_msg } = context;
 
-        const ownerText = `?? *KAIF-MD-V3 OFFICIAL OWNER PROFILE* ??\n\n` +
-            `?? *Developer & Creator:* Kaif x Chaudhary\n\n` +
-            `?? *Super Owner Contacts:*\n` +
-            `  � +92 345 3684061 (Primary)\n` +
-            `  � +92 398 634113\n` +
-            `  � +92 346 6859436\n\n` +
-            `?? *Official WhatsApp Channel:*\n` +
+        const ownerText = `👑 *KAIF-MD-V3 OFFICIAL OWNER PROFILE* 👑\n\n` +
+            `👤 *Developer & Creator:* Kaif x Chaudhary\n\n` +
+            `📞 *Super Owner Contacts:*\n` +
+            `  • +92 345 3684061 (Primary)\n` +
+            `  • +92 398 634113\n` +
+            `  • +92 346 6859436\n\n` +
+            `📢 *Official WhatsApp Channel:*\n` +
             `  https://whatsapp.com/channel/0029VbDMt1C3rZZaigDWAj1X\n\n` +
-            `?? *GitHub Repository:*\n` +
+            `💻 *GitHub Repository:*\n` +
             `  https://github.com/KaifxChaudhary-dev/Kaif-Md-V3\n\n` +
-            `?? *Direct WhatsApp Links:*\n` +
-            `  � wa.me/923453684061\n` +
-            `  � wa.me/92398634113\n` +
-            `  � wa.me/923466859436\n\n` +
-            `> _KAIF-MD-V3 � Developed with ?? by Kaif x Chaudhary_`;
+            `💬 *Direct WhatsApp Links:*\n` +
+            `  • wa.me/923453684061\n` +
+            `  • wa.me/92398634113\n` +
+            `  • wa.me/923466859436\n\n` +
+            `> _KAIF-MD-V3 • Developed with ❤️ by Kaif x Chaudhary_`;
 
         const vcard = `BEGIN:VCARD\n`
             + `VERSION:3.0\n`

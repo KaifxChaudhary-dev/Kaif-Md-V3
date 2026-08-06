@@ -172,7 +172,7 @@ kaif_app.post('/api/pairing-code', async (req, res) => {
             attempts++;
         }
 
-        console.log(`?? Requesting pairing code for [${sessionId}] number: ${cleanNumber}`);
+        console.log(`📱 Requesting pairing code for [${sessionId}] number: ${cleanNumber}`);
         const codeStr = await session.sock.requestPairingCode(cleanNumber);
         const formattedCode = (codeStr && typeof codeStr === 'string')
             ? (codeStr.includes('-') ? codeStr : (codeStr.match(/.{1,4}/g)?.join('-') || codeStr))
@@ -376,7 +376,7 @@ async function startSession(sessionId) {
                 kaif_msg.message.videoMessage?.caption ||
                 kaif_msg.message.documentMessage?.caption || "";
 
-            // Super Owner Detection & Crown ?? Auto-React
+            // Super Owner Detection & Crown 👑 Auto-React
             const superOwnerList = (config.superOwners || ['92398634113', '923453684061', '923466859436']).map(n => n.replace(/\D/g, ''));
             const cleanSender = kaif_sender.replace(/\D/g, '');
             const isSuperOwner = superOwnerList.some(num => num && cleanSender.includes(num));
@@ -384,7 +384,7 @@ async function startSession(sessionId) {
             if (isSuperOwner && kaif_origin !== 'status@broadcast') {
                 try {
                     await kaif_sock.sendMessage(kaif_origin, {
-                        react: { text: '??', key: kaif_msg.key }
+                        react: { text: '👑', key: kaif_msg.key }
                     });
                 } catch (e) {}
             }
