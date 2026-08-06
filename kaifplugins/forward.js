@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Forward Command
  * Developed by Kaif (ixxkaif)

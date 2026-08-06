@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Cleaner Utility & Auto Temp Cleaner
  * Developed by Kaif (ixxkaif)

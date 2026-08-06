@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡* Anti Delete Command
  * Developed by Kaif x Chaudhary
  */

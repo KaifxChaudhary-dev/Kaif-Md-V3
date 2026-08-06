@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Groups JID Utility with Member Counter
  * Developed by Kaif (ixxkaif)

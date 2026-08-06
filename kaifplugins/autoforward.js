@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Global Auto Forward Manager
  * Developed by Kaif (ixxkaif)

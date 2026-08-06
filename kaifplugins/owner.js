@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Owner Information Command
  * Developed by Kaif (ixxkaif)

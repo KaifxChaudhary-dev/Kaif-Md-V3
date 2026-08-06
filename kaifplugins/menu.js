@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Menu Command
  * Developed by Kaif (ixxkaif)

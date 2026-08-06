@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Uptime Command
  * Developed by Kaif (ixxkaif)

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡* Auto Status Command
  * Developed by Kaif x Chaudhary
  */

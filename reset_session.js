@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Kaif-Md-V3 - Reset Session Script* Clears current session from MongoDB and resets .session_id file
  */
 require('dotenv').config();

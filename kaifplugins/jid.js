@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * JID Utility
  * Developed by Kaif (ixxkaif)

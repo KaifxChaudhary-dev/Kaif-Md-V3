@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ KAIF-MD-V3 ⚡
  * Ping Command
  * Developed by Kaif (ixxkaif)

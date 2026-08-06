@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const { BufferJSON, initAuthCreds } = require('@whiskeysockets/baileys');
 
 // Define Schema for Auth with bufferCommands: false to prevent process crash if DB disconnects
