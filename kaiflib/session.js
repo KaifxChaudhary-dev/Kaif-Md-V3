@@ -47,12 +47,11 @@ async function kaif_connectSession(usePairingCode = false, customSessionId = nul
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
         },
-        browser: Browsers.macOS('Desktop'),
+        browser: Browsers.ubuntu('Chrome'),
         generateHighQualityLinkPreview: true,
         syncFullHistory: false,
-        markOnlineOnConnect: false,
-        retryRequestDelayMs: 3000,
-        keepAliveIntervalMs: 15000,
+        retryRequestDelayMs: 5000,
+        keepAliveIntervalMs: 10000,
         connectTimeoutMs: 60000,
     };
 
@@ -61,47 +60,17 @@ async function kaif_connectSession(usePairingCode = false, customSessionId = nul
     return { kaif_sock, saveCreds };
 }
 
-async function kaif_requestPairingCode(sock, phoneNumber) {
-    if (!sock) {
-        throw new Error('Session not ready yet. Please wait and try again.');
+async function kaif_requestPairingCode(kaif_sock, phoneNumber) {
+    if (!kaif_sock) throw new Error('No active session socket to request a pairing code from.');
+    if (kaif_sock.authState?.creds?.registered) {
+        throw new Error('Session is already registered/connected. Pairing code is not needed.');
     }
-
-    if (sock.authState?.creds?.registered) {
-        throw new Error('WhatsApp is already connected!');
+    const cleanNumber = String(phoneNumber || '').replace(/[^0-9]/g, '');
+    if (!cleanNumber || cleanNumber.length < 6) {
+        throw new Error('Please provide a valid phone number with country code (digits only).');
     }
-
-    if (!phoneNumber) {
-        throw new Error('Please enter your phone number with country code.');
-    }
-
-    let cleanNumber = phoneNumber.replace(/[^0-9]/g, '').replace(/^00/, '');
-
-    if (cleanNumber.startsWith('0') && cleanNumber.length === 11) {
-        cleanNumber = '92' + cleanNumber.slice(1);
-    }
-
-    if (!cleanNumber || cleanNumber.length < 10 || cleanNumber.length > 15) {
-        throw new Error('Invalid phone number! Include country code (e.g. 923453684061).');
-    }
-
-    console.log(`📱 Requesting pairing code for number: ${cleanNumber}`);
-
-    let code;
-    try {
-        code = await sock.requestPairingCode(cleanNumber);
-    } catch (err) {
-        if (err.message && (err.message.includes('Closed') || err.message.includes('Precondition'))) {
-            await new Promise(r => setTimeout(r, 1500));
-            code = await sock.requestPairingCode(cleanNumber);
-        } else {
-            throw err;
-        }
-    }
-
-    const rawString = String(code || '').trim().toUpperCase();
-    const formattedCode = rawString.includes('-') ? rawString : (rawString.match(/.{1,4}/g)?.join('-') || rawString);
-
-    return formattedCode;
+    const code = await kaif_sock.requestPairingCode(cleanNumber);
+    return code;
 }
 
 async function kaif_clearSession(customSessionId = null) {
@@ -131,4 +100,4 @@ async function kaif_clearSession(customSessionId = null) {
     }
 }
 
-module.exports = { kaif_connectSession, kaif_requestPairingCode, kaif_clearSession };
+module.exports = { kaif_connectSession, kaif_clearSession, kaif_requestPairingCode };
