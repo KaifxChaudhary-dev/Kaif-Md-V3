@@ -122,7 +122,8 @@ const { processAndCleanMessage, cleanTempFiles } = require('./kaiflib/cleaner');
 // -----------------------------------------------------------------------------
 const sessions = new Map();
 
-// Middleware
+// Middleware & Disable ETag caching for real-time APIs
+kaif_app.set('etag', false);
 kaif_app.use(express.json());
 kaif_app.use(express.static(path.join(__dirname, 'public')));
 
@@ -131,6 +132,10 @@ kaif_app.get('/ping', (req, res) => res.status(200).send('pong'));
 
 // Dashboard APIs
 kaif_app.get('/api/status', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const sessionId = config.sessionId || 'kaif_session';
     const session = sessions.get(sessionId);
     res.json({
