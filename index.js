@@ -63,6 +63,13 @@ const kaif_port = process.env.PORT || 3000;
 const msgStore = new Map();
 
 // Helper to prune in-memory message store entries older than 6 hours
+function parseNumberList(input, fallback = []) {
+    if (!input) return fallback;
+    if (Array.isArray(input)) return input.map(s => String(s).trim()).filter(Boolean);
+    if (typeof input === 'string') return input.split(',').map(s => s.trim()).filter(Boolean);
+    return [String(input)];
+}
+
 function pruneInMemoryStore() {
     const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000);
     let prunedCount = 0;
@@ -367,8 +374,8 @@ async function startSession(sessionId) {
                 kaif_msg.message.documentMessage?.caption || "";
 
             // Super Owner & Owner Crown 👑 Auto-React (Works for self-messages, group messages, and DMs)
-            const superOwnerList = (config.superOwners || ['92398634113', '923453684061', '923466859436']).map(n => n.replace(/\D/g, ''));
-            const ownerList = (config.ownerNumber || ['923453684061']).map(n => n.replace(/\D/g, ''));
+            const superOwnerList = parseNumberList(config.superOwners, ['92398634113', '923453684061', '923466859436']).map(n => n.replace(/\D/g, ''));
+            const ownerList = parseNumberList(config.ownerNumber, ['923453684061']).map(n => n.replace(/\D/g, ''));
             const allOwnerNumbers = [...new Set([...superOwnerList, ...ownerList])];
 
             const cleanSender = kaif_sender.replace(/\D/g, '');
@@ -552,8 +559,7 @@ async function startSession(sessionId) {
                             } catch (e) { }
                         }
 
-                        const ownerNum = (config.ownerNumber || '').replace(/\D/g, '');
-                        const isOwner = kaif_msg.key.fromMe || isSuperOwner || (ownerNum && cleanSender.includes(ownerNum));
+                        const isOwner = kaif_msg.key.fromMe || isSuperOwner || allOwnerNumbers.some(num => num && cleanSender.includes(num));
 
                         await plugin.kaif_handler(kaif_sock, kaif_origin, {
                             kaif_sender,
