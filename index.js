@@ -384,11 +384,16 @@ async function startSession(sessionId) {
         for (const kaif_msg of kaif_m.messages) {
             if (!kaif_msg || !kaif_msg.message) continue;
 
-            const kaif_origin = kaif_msg.key.remoteJid;
+            let kaif_origin = kaif_msg.key.remoteJid;
             const botJid = kaif_sock.user?.id ? jidNormalizedUser(kaif_sock.user.id) : '';
             const kaif_sender = kaif_msg.key.fromMe
                 ? botJid
                 : jidNormalizedUser(kaif_msg.key.participant || kaif_origin);
+
+            // Automatically map WhatsApp Privacy LID JIDs (@lid) to user phone JIDs (@s.whatsapp.net) for 1-on-1 DMs
+            if (kaif_origin && kaif_origin.endsWith('@lid')) {
+                kaif_origin = (kaif_sender && kaif_sender.endsWith('@s.whatsapp.net')) ? kaif_sender : kaif_origin;
+            }
 
             const realMsg = unwrapMessage(kaif_msg.message);
 
