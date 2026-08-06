@@ -717,25 +717,38 @@
                 }
 
                 const qrContainer = document.getElementById('qrContainer');
-                if (data.qr) {
-                    qrContainer.innerHTML = `
-                        <div class="qr-wrapper">
-                            <img src="${data.qr}" alt="WhatsApp QR Code">
-                        </div>
-                        <p style="margin-top: 12px; font-size: 13px; color: var(--text-sub);"><i class="fas fa-camera"></i> Scan with WhatsApp > Linked Devices</p>
-                    `;
-                } else if (data.connected) {
+                const pairDisplay = document.getElementById('pairCodeDisplay');
+
+                if (data.connected) {
                     qrContainer.innerHTML = `
                         <div class="no-qr">
                             <i class="fas fa-circle-check" style="color: #25d366; font-size: 48px;"></i>
                             <span style="color: #25d366; font-weight: 600;">WhatsApp Connected & Ready</span>
                         </div>
                     `;
+                    if (pairDisplay) {
+                        pairDisplay.innerHTML = `
+                            <div style="background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.3); border-radius: 14px; padding: 16px; margin-top: 10px; text-align: center;">
+                                <i class="fas fa-circle-check" style="color: #25d366; font-size: 36px;"></i>
+                                <div style="color: #25d366; font-weight: 700; margin-top: 6px;">WhatsApp Connected & Ready</div>
+                            </div>
+                        `;
+                    }
+                } else if (data.qr) {
+                    qrContainer.innerHTML = `
+                        <div class="qr-wrapper">
+                            <img src="${data.qr}" alt="WhatsApp QR Code">
+                        </div>
+                        <p style="margin-top: 12px; font-size: 13px; color: var(--text-sub);"><i class="fas fa-camera"></i> Scan with WhatsApp > Linked Devices</p>
+                    `;
+                    if (data.pairingCode && pairDisplay && !pairDisplay.innerHTML.includes('YOUR WHATSAPP PAIRING CODE')) {
+                        renderPairingCodeCard(data.pairingCode);
+                    }
                 } else {
                     qrContainer.innerHTML = `
                         <div class="no-qr">
                             <i class="fas fa-spinner fa-spin" style="font-size: 36px;"></i>
-                            <span>Generating QR code...</span>
+                            <span>Generating pairing / QR code...</span>
                         </div>
                     `;
                 }

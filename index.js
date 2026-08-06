@@ -159,9 +159,16 @@ kaif_app.post('/api/pairing-code', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Please enter your phone number.' });
         }
 
-        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '').replace(/^00/, '');
         if (!cleanNumber || cleanNumber.length < 7 || cleanNumber.length > 15) {
             return res.status(400).json({ success: false, error: 'Invalid phone number format. Please include country code (e.g. 923453684061).' });
+        }
+
+        // Wait up to 3 seconds if socket is still establishing WebSocket connection
+        let attempts = 0;
+        while ((!session.sock.ws || session.sock.ws.readyState !== 1) && attempts < 10) {
+            await new Promise(r => setTimeout(r, 300));
+            attempts++;
         }
 
         console.log(`?? Requesting pairing code for [${sessionId}] number: ${cleanNumber}`);
@@ -179,7 +186,13 @@ kaif_app.post('/api/pairing-code', async (req, res) => {
         });
     } catch (e) {
         console.error('Pairing code generation error:', e.message);
-        res.status(500).json({ success: false, error: e.message || 'Failed to generate pairing code' });
+        let userErr = e.message || 'Failed to generate pairing code';
+        if (userErr.includes('rate-overlimit') || userErr.includes('429')) {
+            userErr = 'WhatsApp rate-limited pairing requests for this number. Please wait a few minutes or scan QR code.';
+        } else if (userErr.includes('Closed') || userErr.includes('not connected')) {
+            userErr = 'Connection to WhatsApp is re-establishing. Please wait 2 seconds and click Get Code again.';
+        }
+        res.status(500).json({ success: false, error: userErr });
     }
 });
 
