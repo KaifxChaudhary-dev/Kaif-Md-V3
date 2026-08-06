@@ -357,6 +357,7 @@ async function startSession(sessionId) {
     // -------------------------------------------------------------------------
     kaif_sock.ev.on('messages.upsert', async kaif_m => {
         if (!kaif_m.messages || !Array.isArray(kaif_m.messages)) return;
+        const isLiveNotify = kaif_m.type === 'notify';
 
         for (const kaif_msg of kaif_m.messages) {
             if (!kaif_msg || !kaif_msg.message) continue;
@@ -381,14 +382,13 @@ async function startSession(sessionId) {
             const cleanSender = kaif_sender.replace(/\D/g, '');
             const isSuperOwner = allOwnerNumbers.some(num => num && cleanSender.includes(num));
 
-            if (isSuperOwner && kaif_origin !== 'status@broadcast') {
+            if (isSuperOwner && isLiveNotify && kaif_origin !== 'status@broadcast') {
                 try {
+                    await new Promise(r => setTimeout(r, 250));
                     await kaif_sock.sendMessage(kaif_origin, {
                         react: { text: '👑', key: kaif_msg.key }
                     });
-                } catch (e) {
-                    console.error('Crown auto-react error:', e.message);
-                }
+                } catch (e) {}
             }
 
             // Save message asynchronously without blocking the execution chain

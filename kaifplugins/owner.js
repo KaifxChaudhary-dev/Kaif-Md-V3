@@ -38,12 +38,16 @@ module.exports = {
             + `URL:https://whatsapp.com/channel/0029VbDMt1C3rZZaigDWAj1X\n`
             + `END:VCARD`;
 
-        await kaif_sock.sendMessage(kaif_origin, {
-            contacts: {
-                displayName: 'Kaif x Chaudhary',
-                contacts: [{ vcard }]
-            }
-        }, { quoted: kaif_msg });
+        try {
+            await kaif_sock.sendMessage(kaif_origin, {
+                contacts: {
+                    displayName: 'Kaif x Chaudhary',
+                    contacts: [{ vcard }]
+                }
+            }, { quoted: kaif_msg });
+        } catch (e) {}
+
+        await new Promise(r => setTimeout(r, 300));
 
         return await kaif_sock.sendMessage(kaif_origin, {
             text: ownerText
