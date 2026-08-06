@@ -1,4 +1,4 @@
-const {
+﻿const {
     fetchLatestWaWebVersion,
     makeCacheableSignalKeyStore,
     makeWASocket,
@@ -18,7 +18,6 @@ async function kaif_connectSession(usePairingCode = false, customSessionId = nul
 
     let state, saveCreds;
 
-    // Use MongoDB auth state if MongoDB is connected; otherwise fallback to local multi-file auth state
     if (config.mongoDbUrl && mongoose.connection.readyState === 1) {
         console.log(`💾 Using MongoDB session storage for: ${sessionId}`);
         const auth = await useMongoDBAuthState(sessionId);
@@ -49,17 +48,58 @@ async function kaif_connectSession(usePairingCode = false, customSessionId = nul
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
         },
         browser: Browsers.macOS('Desktop'),
-        markOnlineOnConnect: false,
         generateHighQualityLinkPreview: true,
         syncFullHistory: false,
-        retryRequestDelayMs: 5000,
-        keepAliveIntervalMs: 10000,
+        markOnlineOnConnect: false,
+        retryRequestDelayMs: 3000,
+        keepAliveIntervalMs: 15000,
         connectTimeoutMs: 60000,
     };
 
     const kaif_sock = makeWASocket(socketOptions);
 
     return { kaif_sock, saveCreds };
+}
+
+async function kaif_requestPairingCode(sock, phoneNumber) {
+    if (!sock) {
+        throw new Error('Session not ready yet. Please wait and try again.');
+    }
+
+    if (sock.authState?.creds?.registered) {
+        throw new Error('WhatsApp is already connected!');
+    }
+
+    if (!phoneNumber) {
+        throw new Error('Please enter your phone number with country code.');
+    }
+
+    let cleanNumber = phoneNumber.replace(/[^0-9]/g, '').replace(/^00/, '');
+
+    if (cleanNumber.startsWith('0') && cleanNumber.length === 11) {
+        cleanNumber = '92' + cleanNumber.slice(1);
+    }
+
+    if (!cleanNumber || cleanNumber.length < 10 || cleanNumber.length > 15) {
+        throw new Error('Invalid phone number! Please include your country code (e.g. 923453684061).');
+    }
+
+    let attempts = 0;
+    while ((!sock.ws || sock.ws.readyState !== 1) && attempts < 16) {
+        await new Promise(r => setTimeout(r, 500));
+        attempts++;
+    }
+
+    if (!sock.ws || sock.ws.readyState !== 1) {
+        throw new Error('WhatsApp connection handshake in progress. Please wait 3 seconds and click Get Code again.');
+    }
+
+    console.log(`📱 Requesting pairing code for number: ${cleanNumber}`);
+    const code = await sock.requestPairingCode(cleanNumber);
+    const rawString = String(code || '').trim().toUpperCase();
+    const formattedCode = rawString.includes('-') ? rawString : (rawString.match(/.{1,4}/g)?.join('-') || rawString);
+
+    return formattedCode;
 }
 
 async function kaif_clearSession(customSessionId = null) {
@@ -89,4 +129,4 @@ async function kaif_clearSession(customSessionId = null) {
     }
 }
 
-module.exports = { kaif_connectSession, kaif_clearSession };
+module.exports = { kaif_connectSession, kaif_requestPairingCode, kaif_clearSession };

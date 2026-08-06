@@ -32,7 +32,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
-const { kaif_connectSession, kaif_clearSession } = require('./kaiflib/session');
+const { kaif_connectSession, kaif_requestPairingCode, kaif_clearSession } = require('./kaiflib/session');
 const {
     kaif_connectDatabase,
     kaif_getGroupSettings,
@@ -145,74 +145,28 @@ kaif_app.get('/api/status', async (req, res) => {
 kaif_app.post('/api/pairing-code', async (req, res) => {
     try {
         const sessionId = config.sessionId || 'kaif_session';
-        let session = sessions.get(sessionId);
+        const session = sessions.get(sessionId);
 
         if (!session || !session.sock) {
-            return res.status(400).json({ success: false, error: 'Session initializing... Please wait 3 seconds and try again.' });
+            return res.status(400).json({ success: false, error: 'Session not ready yet. Please wait and try again.' });
         }
 
-        if (session.isConnected || session.sock.authState?.creds?.registered) {
-            return res.status(400).json({ success: false, error: 'WhatsApp is already connected!' });
-        }
+        const { phoneNumber } = req.body || {};
+        const code = await kaif_requestPairingCode(session.sock, phoneNumber);
 
-        let { phoneNumber } = req.body;
-        if (!phoneNumber) {
-            return res.status(400).json({ success: false, error: 'Please enter your phone number with country code.' });
-        }
-
-        let cleanNumber = phoneNumber.replace(/[^0-9]/g, '').replace(/^00/, '');
-        
-        // Auto-fix Pakistani 03xx numbers typed without country code
-        if (cleanNumber.startsWith('0') && cleanNumber.length === 11) {
-            cleanNumber = '92' + cleanNumber.slice(1);
-        }
-
-        if (!cleanNumber || cleanNumber.length < 10 || cleanNumber.length > 15) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Invalid phone number! Please include your country code without + (e.g. 923453684061 for Pakistan, 12025550123 for USA).' 
-            });
-        }
-
-        // Wait up to 10 seconds for socket connection & QR handshake readiness
-        let attempts = 0;
-        while (!session.isReadyForPairing && attempts < 20) {
-            await new Promise(r => setTimeout(r, 500));
-            attempts++;
-        }
-
-        if (!session.isReadyForPairing && (!session.sock.ws || session.sock.ws.readyState !== 1)) {
-            return res.status(500).json({
-                success: false,
-                error: 'WhatsApp connection is initializing. Please wait 2 seconds and click Get Code again.'
-            });
-        }
-
-        console.log(`📱 Requesting pairing code for [${sessionId}] number: ${cleanNumber}`);
-        
-        const rawCode = await session.sock.requestPairingCode(cleanNumber);
-        const rawString = String(rawCode || '').trim().toUpperCase();
-        const formattedCode = rawString.includes('-') ? rawString : (rawString.match(/.{1,4}/g)?.join('-') || rawString);
-        const cleanCode = rawString.replace(/[^A-Z0-9]/g, '');
-
-        session.pairingCode = formattedCode;
+        const cleanCode = String(code || '').replace(/[^A-Z0-9]/g, '');
+        session.pairingCode = code;
 
         res.json({
             success: true,
-            pairingCode: formattedCode,
+            pairingCode: code,
             rawCode: cleanCode,
-            phoneNumber: cleanNumber,
-            message: 'Pairing code generated successfully!'
+            phoneNumber,
+            code
         });
     } catch (e) {
-        console.error('Pairing code generation error:', e.message);
-        let userErr = e.message || 'Failed to generate pairing code';
-        if (userErr.includes('rate-overlimit') || userErr.includes('429')) {
-            userErr = 'WhatsApp rate-limited requests for this number. Please wait 5 minutes or scan the QR code.';
-        } else if (userErr.includes('Closed') || userErr.includes('not connected') || userErr.includes('Precondition Required')) {
-            userErr = 'Connection handshake in progress. Please wait 3 seconds and click Get Code again.';
-        }
-        res.status(500).json({ success: false, error: userErr });
+        console.error('POST /api/pairing-code Error:', e.message);
+        res.status(400).json({ success: false, error: e.message });
     }
 });
 
