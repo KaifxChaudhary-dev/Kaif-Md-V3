@@ -81,21 +81,23 @@ async function kaif_requestPairingCode(sock, phoneNumber) {
     }
 
     if (!cleanNumber || cleanNumber.length < 10 || cleanNumber.length > 15) {
-        throw new Error('Invalid phone number! Please include your country code (e.g. 923453684061).');
-    }
-
-    let attempts = 0;
-    while ((!sock.ws || sock.ws.readyState !== 1) && attempts < 16) {
-        await new Promise(r => setTimeout(r, 500));
-        attempts++;
-    }
-
-    if (!sock.ws || sock.ws.readyState !== 1) {
-        throw new Error('WhatsApp connection handshake in progress. Please wait 3 seconds and click Get Code again.');
+        throw new Error('Invalid phone number! Include country code (e.g. 923453684061).');
     }
 
     console.log(`📱 Requesting pairing code for number: ${cleanNumber}`);
-    const code = await sock.requestPairingCode(cleanNumber);
+
+    let code;
+    try {
+        code = await sock.requestPairingCode(cleanNumber);
+    } catch (err) {
+        if (err.message && (err.message.includes('Closed') || err.message.includes('Precondition'))) {
+            await new Promise(r => setTimeout(r, 1500));
+            code = await sock.requestPairingCode(cleanNumber);
+        } else {
+            throw err;
+        }
+    }
+
     const rawString = String(code || '').trim().toUpperCase();
     const formattedCode = rawString.includes('-') ? rawString : (rawString.match(/.{1,4}/g)?.join('-') || rawString);
 
