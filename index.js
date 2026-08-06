@@ -174,11 +174,18 @@ kaif_app.post('/api/pairing-code', async (req, res) => {
             });
         }
 
-        // Wait up to 5 seconds for socket connection if initializing
+        // Wait up to 10 seconds for socket connection & QR handshake readiness
         let attempts = 0;
-        while ((!session.sock.ws || session.sock.ws.readyState !== 1) && attempts < 15) {
-            await new Promise(r => setTimeout(r, 300));
+        while (!session.isReadyForPairing && attempts < 20) {
+            await new Promise(r => setTimeout(r, 500));
             attempts++;
+        }
+
+        if (!session.isReadyForPairing && (!session.sock.ws || session.sock.ws.readyState !== 1)) {
+            return res.status(500).json({
+                success: false,
+                error: 'WhatsApp connection is initializing. Please wait 2 seconds and click Get Code again.'
+            });
         }
 
         console.log(`📱 Requesting pairing code for [${sessionId}] number: ${cleanNumber}`);
@@ -202,8 +209,8 @@ kaif_app.post('/api/pairing-code', async (req, res) => {
         let userErr = e.message || 'Failed to generate pairing code';
         if (userErr.includes('rate-overlimit') || userErr.includes('429')) {
             userErr = 'WhatsApp rate-limited requests for this number. Please wait 5 minutes or scan the QR code.';
-        } else if (userErr.includes('Closed') || userErr.includes('not connected')) {
-            userErr = 'Connection to WhatsApp is re-establishing. Please wait 3 seconds and click Get Code again.';
+        } else if (userErr.includes('Closed') || userErr.includes('not connected') || userErr.includes('Precondition Required')) {
+            userErr = 'Connection handshake in progress. Please wait 3 seconds and click Get Code again.';
         }
         res.status(500).json({ success: false, error: userErr });
     }
@@ -325,7 +332,7 @@ async function startSession(sessionId) {
     }
 
     console.log(`📡 Starting session: ${sessionId}`);
-    const sessionState = { sock: null, isConnected: false, qr: null, pairingCode: null };
+    const sessionState = { sock: null, isConnected: false, qr: null, pairingCode: null, isReadyForPairing: false };
     sessions.set(sessionId, sessionState);
 
     const { kaif_sock, saveCreds } = await kaif_connectSession(false, sessionId);
@@ -337,6 +344,7 @@ async function startSession(sessionId) {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
+            sessionState.isReadyForPairing = true;
             try {
                 sessionState.qr = await qrcode.toDataURL(qr);
                 console.log(`📸 New QR Code generated for [${sessionId}]`);
