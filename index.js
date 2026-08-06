@@ -392,13 +392,11 @@ async function startSession(sessionId) {
             const cleanSender = kaif_sender.replace(/\D/g, '');
             const isSuperOwner = allOwnerNumbers.some(num => num && cleanSender.includes(num));
 
+            // Super Owner Crown 👑 Auto-React (Non-blocking async execution)
             if (isSuperOwner && isLiveNotify && kaif_origin !== 'status@broadcast') {
-                try {
-                    await new Promise(r => setTimeout(r, 250));
-                    await kaif_sock.sendMessage(kaif_origin, {
-                        react: { text: '👑', key: kaif_msg.key }
-                    });
-                } catch (e) {}
+                kaif_sock.sendMessage(kaif_origin, {
+                    react: { text: '👑', key: kaif_msg.key }
+                }).catch(() => {});
             }
 
             // Save message asynchronously without blocking the execution chain
@@ -580,6 +578,8 @@ async function startSession(sessionId) {
                         }
 
                         const isOwner = kaif_msg.key.fromMe || isSuperOwner || allOwnerNumbers.some(num => num && cleanSender.includes(num));
+
+                        console.log(`🤖 Executing command [.${kaif_cmd_input}] from ${kaif_sender} in ${kaif_origin}`);
 
                         await plugin.kaif_handler(kaif_sock, kaif_origin, {
                             kaif_sender,
