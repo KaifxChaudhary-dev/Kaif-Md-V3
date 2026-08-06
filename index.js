@@ -1,4 +1,4 @@
-const dns = require('dns');
+﻿const dns = require('dns');
 try { dns.setServers(['8.8.8.8', '1.1.1.1']); } catch (e) {}
 /**
  * ⚡ KAIF-MD-V3 ⚡
@@ -73,6 +73,18 @@ const kaif_port = process.env.PORT || 3000;
 const msgStore = new Map();
 
 // Helper to prune in-memory message store entries older than 6 hours
+function unwrapMessage(msg) {
+    if (!msg) return {};
+    let m = msg;
+    if (m.ephemeralMessage?.message) m = m.ephemeralMessage.message;
+    if (m.viewOnceMessage?.message) m = m.viewOnceMessage.message;
+    if (m.viewOnceMessageV2?.message) m = m.viewOnceMessageV2.message;
+    if (m.viewOnceMessageV2Extension?.message) m = m.viewOnceMessageV2Extension.message;
+    if (m.documentWithCaptionMessage?.message) m = m.documentWithCaptionMessage.message;
+    if (m.editedMessage?.message) m = m.editedMessage.message;
+    return m;
+}
+
 function parseNumberList(input, fallback = []) {
     if (!input) return fallback;
     if (Array.isArray(input)) return input.map(s => String(s).trim()).filter(Boolean);
@@ -378,11 +390,13 @@ async function startSession(sessionId) {
                 ? botJid
                 : jidNormalizedUser(kaif_msg.key.participant || kaif_origin);
 
-            const kaif_text = kaif_msg.message.conversation ||
-                kaif_msg.message.extendedTextMessage?.text ||
-                kaif_msg.message.imageMessage?.caption ||
-                kaif_msg.message.videoMessage?.caption ||
-                kaif_msg.message.documentMessage?.caption || "";
+            const realMsg = unwrapMessage(kaif_msg.message);
+
+            const kaif_text = realMsg.conversation ||
+                realMsg.extendedTextMessage?.text ||
+                realMsg.imageMessage?.caption ||
+                realMsg.videoMessage?.caption ||
+                realMsg.documentMessage?.caption || "";
 
             // Super Owner & Owner Crown 👑 Auto-React (Works for self-messages, group messages, and DMs)
             const superOwnerList = parseNumberList(config.superOwners, ['92398634113', '923453684061', '923466859436']).map(n => n.replace(/\D/g, ''));
