@@ -17,18 +17,28 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Filter out noisy libsignal decryption/Bad MAC console spam
 const originalConsoleError = console.error;
-console.error = function (...args) {
-    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    if (
+const originalConsoleLog = console.log;
+
+const isNoisyLog = (msg) => {
+    return (
         msg.includes('Bad MAC') ||
         msg.includes('Closing session: SessionEntry') ||
         msg.includes('Failed to decrypt message') ||
         msg.includes('Decrypted message with closed session') ||
         msg.includes('Closing open session in favor of incoming prekey bundle')
-    ) {
-        return;
-    }
+    );
+};
+
+console.error = function (...args) {
+    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    if (isNoisyLog(msg)) return;
     originalConsoleError.apply(console, args);
+};
+
+console.log = function (...args) {
+    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    if (isNoisyLog(msg)) return;
+    originalConsoleLog.apply(console, args);
 };
 
 const {
