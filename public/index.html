@@ -742,7 +742,7 @@
                         <p style="margin-top: 12px; font-size: 13px; color: var(--text-sub);"><i class="fas fa-camera"></i> Scan with WhatsApp > Linked Devices</p>
                     `;
                     if (data.pairingCode && pairDisplay && !pairDisplay.innerHTML.includes('YOUR WHATSAPP PAIRING CODE')) {
-                        renderPairingCodeCard(data.pairingCode);
+                        renderPairingCodeCard(data.pairingCode, data.rawCode, data.phoneNumber);
                     }
                 } else {
                     qrContainer.innerHTML = `
@@ -815,7 +815,7 @@
 
                 const data = await res.json();
                 if (data.success && data.pairingCode) {
-                    renderPairingCodeCard(data.pairingCode);
+                    renderPairingCodeCard(data.pairingCode, data.rawCode, data.phoneNumber);
                 } else {
                     display.innerHTML = '<span style="color: #ff4d4d; font-size: 13px;"><i class="fas fa-circle-exclamation"></i> ' + (data.error || 'Failed to get code') + '</span>';
                 }

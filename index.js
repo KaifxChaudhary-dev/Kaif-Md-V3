@@ -145,53 +145,65 @@ kaif_app.get('/api/status', async (req, res) => {
 kaif_app.post('/api/pairing-code', async (req, res) => {
     try {
         const sessionId = config.sessionId || 'kaif_session';
-        const session = sessions.get(sessionId);
+        let session = sessions.get(sessionId);
 
         if (!session || !session.sock) {
-            return res.status(400).json({ success: false, error: 'Session not initialized yet. Please refresh the page.' });
+            return res.status(400).json({ success: false, error: 'Session initializing... Please wait 3 seconds and try again.' });
         }
 
         if (session.isConnected || session.sock.authState?.creds?.registered) {
             return res.status(400).json({ success: false, error: 'WhatsApp is already connected!' });
         }
 
-        const { phoneNumber } = req.body;
+        let { phoneNumber } = req.body;
         if (!phoneNumber) {
-            return res.status(400).json({ success: false, error: 'Please enter your phone number.' });
+            return res.status(400).json({ success: false, error: 'Please enter your phone number with country code.' });
         }
 
-        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '').replace(/^00/, '');
-        if (!cleanNumber || cleanNumber.length < 7 || cleanNumber.length > 15) {
-            return res.status(400).json({ success: false, error: 'Invalid phone number format. Please include country code (e.g. 923453684061).' });
+        let cleanNumber = phoneNumber.replace(/[^0-9]/g, '').replace(/^00/, '');
+        
+        // Auto-fix Pakistani 03xx numbers typed without country code
+        if (cleanNumber.startsWith('0') && cleanNumber.length === 11) {
+            cleanNumber = '92' + cleanNumber.slice(1);
         }
 
-        // Wait up to 3 seconds if socket is still establishing WebSocket connection
+        if (!cleanNumber || cleanNumber.length < 10 || cleanNumber.length > 15) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Invalid phone number! Please include your country code without + (e.g. 923453684061 for Pakistan, 12025550123 for USA).' 
+            });
+        }
+
+        // Wait up to 5 seconds for socket connection if initializing
         let attempts = 0;
-        while ((!session.sock.ws || session.sock.ws.readyState !== 1) && attempts < 10) {
+        while ((!session.sock.ws || session.sock.ws.readyState !== 1) && attempts < 15) {
             await new Promise(r => setTimeout(r, 300));
             attempts++;
         }
 
         console.log(`📱 Requesting pairing code for [${sessionId}] number: ${cleanNumber}`);
-        const codeStr = await session.sock.requestPairingCode(cleanNumber);
-        const formattedCode = (codeStr && typeof codeStr === 'string')
-            ? (codeStr.includes('-') ? codeStr : (codeStr.match(/.{1,4}/g)?.join('-') || codeStr))
-            : codeStr;
+        
+        const rawCode = await session.sock.requestPairingCode(cleanNumber);
+        const rawString = String(rawCode || '').trim().toUpperCase();
+        const formattedCode = rawString.includes('-') ? rawString : (rawString.match(/.{1,4}/g)?.join('-') || rawString);
+        const cleanCode = rawString.replace(/[^A-Z0-9]/g, '');
 
         session.pairingCode = formattedCode;
 
         res.json({
             success: true,
             pairingCode: formattedCode,
+            rawCode: cleanCode,
+            phoneNumber: cleanNumber,
             message: 'Pairing code generated successfully!'
         });
     } catch (e) {
         console.error('Pairing code generation error:', e.message);
         let userErr = e.message || 'Failed to generate pairing code';
         if (userErr.includes('rate-overlimit') || userErr.includes('429')) {
-            userErr = 'WhatsApp rate-limited pairing requests for this number. Please wait a few minutes or scan QR code.';
+            userErr = 'WhatsApp rate-limited requests for this number. Please wait 5 minutes or scan the QR code.';
         } else if (userErr.includes('Closed') || userErr.includes('not connected')) {
-            userErr = 'Connection to WhatsApp is re-establishing. Please wait 2 seconds and click Get Code again.';
+            userErr = 'Connection to WhatsApp is re-establishing. Please wait 3 seconds and click Get Code again.';
         }
         res.status(500).json({ success: false, error: userErr });
     }
