@@ -458,6 +458,57 @@
 
             <!-- Auto Forward Setup -->
             <div class="section-title"><i class="fas fa-route"></i> Auto Forward Rules</div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-filter"></i> Allowed Forward Types</label>
+                <div class="toggle-grid" style="margin-top: 8px;">
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <span class="toggle-name"><i class="fas fa-image" style="color: #3b82f6;"></i> Pictures</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="fwdPictureToggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <span class="toggle-name"><i class="fas fa-video" style="color: #ef4444;"></i> Videos</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="fwdVideoToggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <span class="toggle-name"><i class="fas fa-music" style="color: #10b981;"></i> Audios</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="fwdAudioToggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <span class="toggle-name"><i class="fas fa-file-lines" style="color: #f59e0b;"></i> Documents</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="fwdDocumentToggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <div class="toggle-info">
+                            <span class="toggle-name"><i class="fas fa-comment-dots" style="color: #8b5cf6;"></i> Text</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="fwdTextToggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
             <div class="form-group">
                 <label><i class="fas fa-right-to-bracket"></i> Source JIDs (comma-separated)</label>
                 <textarea id="sourceJids" class="form-control" rows="2" placeholder="e.g. 1234567890@g.us, 0987654321@s.whatsapp.net"></textarea>
@@ -509,6 +560,12 @@
                 document.getElementById('autoStatusReactToggle').checked = data.autoStatusReact !== false;
                 document.getElementById('autoForwardToggle').checked = !!data.autoForwardEnabled;
 
+                document.getElementById('fwdPictureToggle').checked = data.forwardPicture !== false;
+                document.getElementById('fwdVideoToggle').checked = data.forwardVideo !== false;
+                document.getElementById('fwdAudioToggle').checked = data.forwardAudio !== false;
+                document.getElementById('fwdDocumentToggle').checked = data.forwardDocument !== false;
+                document.getElementById('fwdTextToggle').checked = data.forwardText !== false;
+
                 document.getElementById('sourceJids').value = data.sourceJids?.join(', ') || '';
                 document.getElementById('targetJids').value = data.targetJids?.join(', ') || '';
                 document.getElementById('oldTextRegex').value = data.oldTextRegex?.join(', ') || '';
@@ -524,6 +581,11 @@
             const autoStatusSeen = document.getElementById('autoStatusSeenToggle').checked;
             const autoStatusReact = document.getElementById('autoStatusReactToggle').checked;
             const autoForwardEnabled = document.getElementById('autoForwardToggle').checked;
+            const forwardPicture = document.getElementById('fwdPictureToggle').checked;
+            const forwardVideo = document.getElementById('fwdVideoToggle').checked;
+            const forwardAudio = document.getElementById('fwdAudioToggle').checked;
+            const forwardDocument = document.getElementById('fwdDocumentToggle').checked;
+            const forwardText = document.getElementById('fwdTextToggle').checked;
 
             const sourceJids = document.getElementById('sourceJids').value.split(',').map(j => j.trim()).filter(j => j);
             const targetJids = document.getElementById('targetJids').value.split(',').map(j => j.trim()).filter(j => j);
@@ -542,6 +604,11 @@
                         autoStatusSeen,
                         autoStatusReact,
                         autoForwardEnabled,
+                        forwardPicture,
+                        forwardVideo,
+                        forwardAudio,
+                        forwardDocument,
+                        forwardText,
                         sourceJids,
                         targetJids,
                         oldTextRegex,

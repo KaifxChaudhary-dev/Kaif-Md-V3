@@ -98,6 +98,11 @@ const kaif_globalAutoForwardSchema = new mongoose.Schema({
     sourceJids: { type: [String], default: [] },
     targetJids: { type: [String], default: [] },
     autoForwardTimestamp: { type: Boolean, default: false },
+    forwardPicture: { type: Boolean, default: true },
+    forwardVideo: { type: Boolean, default: true },
+    forwardAudio: { type: Boolean, default: true },
+    forwardDocument: { type: Boolean, default: true },
+    forwardText: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now }
 });
 

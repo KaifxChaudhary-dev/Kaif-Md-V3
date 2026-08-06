@@ -153,7 +153,12 @@ kaif_app.get('/api/config', async (req, res) => {
             sourceJids: globalCfg?.sourceJids || [],
             targetJids: globalCfg?.targetJids || [],
             oldTextRegex: globalCfg?.oldTextRegex || [],
-            newText: globalCfg?.newText || ""
+            newText: globalCfg?.newText || "",
+            forwardPicture: globalCfg ? globalCfg.forwardPicture !== false : true,
+            forwardVideo: globalCfg ? globalCfg.forwardVideo !== false : true,
+            forwardAudio: globalCfg ? globalCfg.forwardAudio !== false : true,
+            forwardDocument: globalCfg ? globalCfg.forwardDocument !== false : true,
+            forwardText: globalCfg ? globalCfg.forwardText !== false : true
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -171,7 +176,12 @@ kaif_app.post('/api/config', async (req, res) => {
             sourceJids,
             targetJids,
             oldTextRegex,
-            newText
+            newText,
+            forwardPicture,
+            forwardVideo,
+            forwardAudio,
+            forwardDocument,
+            forwardText
         } = req.body;
 
         await kaif_updateBotConfig(sessionId, {
@@ -185,7 +195,12 @@ kaif_app.post('/api/config', async (req, res) => {
             sourceJids: Array.isArray(sourceJids) ? sourceJids : (sourceJids || '').split(',').map(s => s.trim()).filter(Boolean),
             targetJids: Array.isArray(targetJids) ? targetJids : (targetJids || '').split(',').map(t => t.trim()).filter(Boolean),
             oldTextRegex: Array.isArray(oldTextRegex) ? oldTextRegex : (oldTextRegex || '').split(',').map(r => r.trim()).filter(Boolean),
-            newText: newText || ""
+            newText: newText || "",
+            forwardPicture: forwardPicture ?? true,
+            forwardVideo: forwardVideo ?? true,
+            forwardAudio: forwardAudio ?? true,
+            forwardDocument: forwardDocument ?? true,
+            forwardText: forwardText ?? true
         });
 
         res.json({ success: true, message: 'Settings saved successfully!' });
@@ -415,50 +430,39 @@ async function startSession(sessionId) {
 
                         let relayMsg = processAndCleanMessage(kaif_msg.message, customRegexList, globalCfg.newText || "");
 
-                        if (globalCfg.autoForwardTimestamp) {
-                            const timeStr = `\n\n_[${new Date().toLocaleTimeString()}]_`;
-                            if (relayMsg.conversation) relayMsg.conversation += timeStr;
-                            else if (relayMsg.extendedTextMessage?.text) relayMsg.extendedTextMessage.text += timeStr;
-                            else if (relayMsg.imageMessage) relayMsg.imageMessage.caption = (relayMsg.imageMessage.caption || "") + timeStr;
-                            else if (relayMsg.videoMessage) relayMsg.videoMessage.caption = (relayMsg.videoMessage.caption || "") + timeStr;
-                            else if (relayMsg.documentMessage) relayMsg.documentMessage.caption = (relayMsg.documentMessage.caption || "") + timeStr;
-                        }
+                        // Media type filtering check based on Dashboard settings
+                        let shouldForward = true;
+                        if (relayMsg.imageMessage && globalCfg.forwardPicture === false) shouldForward = false;
+                        else if (relayMsg.videoMessage && globalCfg.forwardVideo === false) shouldForward = false;
+                        else if (relayMsg.audioMessage && globalCfg.forwardAudio === false) shouldForward = false;
+                        else if (relayMsg.documentMessage && globalCfg.forwardDocument === false) shouldForward = false;
+                        else if ((relayMsg.conversation || relayMsg.extendedTextMessage) && globalCfg.forwardText === false) shouldForward = false;
 
-                        for (const targetJid of globalCfg.targetJids) {
-                            try {
-                                await kaif_sock.relayMessage(targetJid, relayMsg, {
-                                    messageId: kaif_sock.generateMessageTag()
-                                });
-                                await new Promise(r => setTimeout(r, 50));
-                            } catch (err) {
-                                console.error(`[GLOBAL-FORWARD] Failed for ${targetJid}:`, err.message);
+                        if (shouldForward) {
+                            if (globalCfg.autoForwardTimestamp) {
+                                const timeStr = `\n\n_[${new Date().toLocaleTimeString()}]_`;
+                                if (relayMsg.conversation) relayMsg.conversation += timeStr;
+                                else if (relayMsg.extendedTextMessage?.text) relayMsg.extendedTextMessage.text += timeStr;
+                                else if (relayMsg.imageMessage) relayMsg.imageMessage.caption = (relayMsg.imageMessage.caption || "") + timeStr;
+                                else if (relayMsg.videoMessage) relayMsg.videoMessage.caption = (relayMsg.videoMessage.caption || "") + timeStr;
+                                else if (relayMsg.documentMessage) relayMsg.documentMessage.caption = (relayMsg.documentMessage.caption || "") + timeStr;
+                            }
+
+                            for (const targetJid of globalCfg.targetJids) {
+                                try {
+                                    await kaif_sock.relayMessage(targetJid, relayMsg, {
+                                        messageId: kaif_sock.generateMessageTag()
+                                    });
+                                    await new Promise(r => setTimeout(r, 50));
+                                } catch (err) {
+                                    console.error(`[GLOBAL-FORWARD] Failed for ${targetJid}:`, err.message);
+                                }
                             }
                         }
                     }
                 } catch (err) {
                     console.error('[GLOBAL-FORWARD] Error:', err.message);
                 }
-            }
-
-            // 2. GROUP-SPECIFIC AUTO FORWARD LOGIC
-            if (kaif_origin.endsWith('@g.us') && !kaif_msg.key.fromMe) {
-                try {
-                    const groupSettings = await kaif_getGroupSettings(sessionId, kaif_origin);
-                    if (groupSettings && groupSettings.autoForward && groupSettings.autoForwardTargets?.length > 0) {
-                        let relayMsg = processAndCleanMessage(kaif_msg.message);
-
-                        for (const targetJid of groupSettings.autoForwardTargets) {
-                            try {
-                                await kaif_sock.relayMessage(targetJid, relayMsg, {
-                                    messageId: kaif_sock.generateMessageTag()
-                                });
-                                await new Promise(r => setTimeout(r, 50));
-                            } catch (err) {
-                                console.error(`[AUTO-FORWARD] Failed for ${targetJid}:`, err.message);
-                            }
-                        }
-                    }
-                } catch (err) { }
             }
 
             // 3. COMMAND HANDLER
