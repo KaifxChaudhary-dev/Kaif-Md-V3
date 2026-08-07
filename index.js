@@ -7,19 +7,43 @@ try { dns.setServers(['8.8.8.8', '1.1.1.1']); } catch (e) {}
  */
 require('dotenv').config();
 
-process.on('uncaughtException', (err) => {
-    console.error('⚠️ Uncaught Exception:', err.message);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
-});
-
-// Filter out noisy libsignal decryption/Bad MAC console spam
+// Backup original console methods
 const originalConsoleError = console.error;
 const originalConsoleLog = console.log;
 
+// SSE log clients for dashboard live log streaming
+const logClients = new Set();
+const broadcastLog = (type, text) => {
+    if (!logClients.size) return;
+    const payload = `data: ${JSON.stringify({ type, text, timestamp: new Date().toISOString() })}\n\n`;
+    for (const clientRes of logClients) {
+        try {
+            clientRes.write(payload);
+        } catch (e) {
+            logClients.delete(clientRes);
+        }
+    }
+};
+
+process.on('uncaughtException', (err) => {
+    try {
+        const msg = `Uncaught Exception: ${err?.stack || err?.message || String(err)}`;
+        broadcastLog('error', msg);
+        originalConsoleError.apply(console, ['s,? Uncaught Exception:', err?.stack || err?.message || String(err)]);
+    } catch (e) {}
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    try {
+        const msg = `Unhandled Rejection: ${reason?.stack || reason?.message || String(reason)}`;
+        broadcastLog('error', msg);
+        originalConsoleError.apply(console, ['s,? Unhandled Rejection:', reason?.stack || reason?.message || String(reason)]);
+    } catch (e) {}
+});
+
+// Filter out noisy libsignal decryption/Bad MAC console spam
 const isNoisyLog = (msg) => {
+    if (!msg || typeof msg !== 'string') return false;
     return (
         msg.includes('Bad MAC') ||
         msg.includes('Closing session: SessionEntry') ||
@@ -34,15 +58,34 @@ const isNoisyLog = (msg) => {
     );
 };
 
+const safeFormatArg = (a) => {
+    if (a === null || a === undefined) return String(a);
+    if (typeof a === 'string') return a;
+    if (typeof a === 'object') {
+        try {
+            return JSON.stringify(a);
+        } catch (e) {
+            return String(a);
+        }
+    }
+    return String(a);
+};
+
 console.error = function (...args) {
-    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    if (isNoisyLog(msg)) return;
+    try {
+        const msg = args.map(safeFormatArg).join(' ');
+        if (isNoisyLog(msg)) return;
+        broadcastLog('error', msg);
+    } catch (e) {}
     originalConsoleError.apply(console, args);
 };
 
 console.log = function (...args) {
-    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    if (isNoisyLog(msg)) return;
+    try {
+        const msg = args.map(safeFormatArg).join(' ');
+        if (isNoisyLog(msg)) return;
+        broadcastLog('log', msg);
+    } catch (e) {}
     originalConsoleLog.apply(console, args);
 };
 
@@ -173,6 +216,22 @@ kaif_app.use(express.static(path.join(__dirname, 'public')));
 kaif_app.get('/ping', (req, res) => res.status(200).send('pong'));
 
 // Dashboard APIs
+// SSE Real-Time Logs Stream
+kaif_app.get('/api/logs', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (res.flushHeaders) res.flushHeaders();
+
+    logClients.add(res);
+    res.write(`data: ${JSON.stringify({ type: 'info', text: 'Connected to live log stream', timestamp: new Date().toISOString() })}\n\n`);
+
+    req.on('close', () => {
+        logClients.delete(res);
+    });
+});
+
 kaif_app.get('/api/status', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');

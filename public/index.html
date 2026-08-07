@@ -570,6 +570,19 @@
             <div id="configMessage"></div>
 
             <!-- Footer -->
+            
+            <!-- Live Server Log Stream -->
+            <div class="section-title"><i class="fas fa-terminal"></i> Live Server Log Stream</div>
+            <div style="background: #0f172a; border-radius: 12px; border: 1px solid var(--card-border); padding: 14px; margin-bottom: 20px; font-family: 'Courier New', monospace;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #1e293b; padding-bottom: 6px;">
+                    <span style="font-size: 12px; color: #94a3b8; font-weight: bold;"><i class="fas fa-signal" id="logStreamIcon" style="color: #10b981;"></i> Status: <span id="logStreamStatus" style="color: #10b981;">Connected</span></span>
+                    <button onclick="clearLogConsole()" style="background: transparent; border: 1px solid #334155; color: #94a3b8; font-size: 11px; padding: 2px 8px; border-radius: 6px; cursor: pointer;">Clear Console</button>
+                </div>
+                <div id="logConsole" style="height: 180px; overflow-y: auto; font-size: 12px; line-height: 1.5; color: #e2e8f0; word-break: break-all; scroll-behavior: smooth;">
+                    <div style="color: #64748b;">[System] Initializing live log stream...</div>
+                </div>
+            </div>
+
             <div class="footer">
                 <p>Made with ❤️ by <a href="https://github.com/KaifxChaudhary-dev" target="_blank">Kaif-Md-V3</a></p>
             </div>
@@ -860,6 +873,84 @@
         loadConfig();
         checkStatus();
         setInterval(checkStatus, 3000);
+    
+        // Live SSE Log Stream Reader with Auto-Reconnect
+        function initLogStream() {
+            const consoleEl = document.getElementById('logConsole');
+            const statusEl = document.getElementById('logStreamStatus');
+            const iconEl = document.getElementById('logStreamIcon');
+            
+            if (!consoleEl) return;
+
+            let eventSource = null;
+            let reconnectTimer = null;
+
+            function connect() {
+                if (eventSource) eventSource.close();
+
+                statusEl.textContent = 'Connecting...';
+                statusEl.style.color = '#f59e0b';
+                iconEl.style.color = '#f59e0b';
+
+                eventSource = new EventSource('/api/logs');
+
+                eventSource.onopen = () => {
+                    statusEl.textContent = 'Connected';
+                    statusEl.style.color = '#10b981';
+                    iconEl.style.color = '#10b981';
+                    if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+                };
+
+                eventSource.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'heartbeat') return;
+
+                        const line = document.createElement('div');
+                        const timeStr = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+                        
+                        if (data.type === 'error') {
+                            line.style.color = '#f87171';
+                        } else {
+                            line.style.color = '#38bdf8';
+                        }
+                        
+                        line.textContent = `[${timeStr}] ${data.text}`;
+                        consoleEl.appendChild(line);
+
+                        if (consoleEl.children.length > 200) {
+                            consoleEl.removeChild(consoleEl.firstChild);
+                        }
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    } catch (e) {}
+                };
+
+                eventSource.onerror = () => {
+                    statusEl.textContent = 'Disconnected (Reconnecting...)';
+                    statusEl.style.color = '#ef4444';
+                    iconEl.style.color = '#ef4444';
+                    eventSource.close();
+
+                    if (!reconnectTimer) {
+                        reconnectTimer = setInterval(() => {
+                            connect();
+                        }, 5000);
+                    }
+                };
+            }
+
+            connect();
+        }
+
+        function clearLogConsole() {
+            const consoleEl = document.getElementById('logConsole');
+            if (consoleEl) consoleEl.innerHTML = '<div style="color: #64748b;">[System] Console cleared. Listening for new logs...</div>';
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initLogStream();
+        });
+
     </script>
 </body>
 </html>
