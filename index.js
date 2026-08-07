@@ -462,18 +462,39 @@ async function startSession(sessionId) {
                 realMsg.videoMessage?.caption ||
                 realMsg.documentMessage?.caption || "";
 
-            // Super Owner & Owner Crown 👑 Auto-React (Works for self-messages, group messages, and DMs)
-            const superOwnerList = parseNumberList(config.superOwners, ['92398634113', '923453684061', '923466859436']).map(n => n.replace(/\D/g, ''));
-            const ownerList = parseNumberList(config.ownerNumber, ['923453684061']).map(n => n.replace(/\D/g, ''));
-            const allOwnerNumbers = [...new Set([...superOwnerList, ...ownerList])];
+            // 👑 OWNER / SUPER OWNER AUTO-REACT
+            const superOwnerList = parseNumberList(
+                config.superOwners,
+                ['92398634113', '923453684061', '923466859436']
+            ).map(n => n.replace(/\D/g, ''));
 
-            const cleanSender = kaif_sender.replace(/\D/g, '');
-            const isSuperOwner = allOwnerNumbers.some(num => num && cleanSender.includes(num));
+            const ownerList = parseNumberList(
+                config.ownerNumber,
+                ['923453684061']
+            ).map(n => n.replace(/\D/g, ''));
 
-            // Super Owner Crown 👑 Auto-React (Non-blocking async execution)
-            if (isSuperOwner && isLiveNotify && kaif_origin !== 'status@broadcast') {
+            const allOwnerNumbers = [
+                ...new Set([...superOwnerList, ...ownerList])
+            ];
+
+            const cleanSender = (kaif_sender || '').replace(/\D/g, '');
+
+            const isOwnerCrown = allOwnerNumbers.some(
+                num => num && (cleanSender === num || cleanSender.includes(num))
+            );
+
+            // 👑 React to owner/super-owner messages
+            if (
+                isOwnerCrown &&
+                isLiveNotify &&
+                kaif_origin !== 'status@broadcast' &&
+                kaif_msg?.key
+            ) {
                 kaif_sock.sendMessage(kaif_origin, {
-                    react: { text: '👑', key: kaif_msg.key }
+                    react: {
+                        text: '👑',
+                        key: kaif_msg.key
+                    }
                 }).catch(() => {});
             }
 
