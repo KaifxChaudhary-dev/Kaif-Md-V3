@@ -462,7 +462,7 @@ async function startSession(sessionId) {
                 realMsg.videoMessage?.caption ||
                 realMsg.documentMessage?.caption || "";
 
-            // 👑 OWNER / SUPER OWNER AUTO-REACT
+            // 👑 OWNER / SUPER OWNER AUTO-REACT ONLY
             const superOwnerList = parseNumberList(
                 config.superOwners,
                 ['92398634113', '923453684061', '923466859436']
@@ -479,16 +479,16 @@ async function startSession(sessionId) {
 
             const cleanSender = (kaif_sender || '').replace(/\D/g, '');
 
-            const isOwnerCrown = allOwnerNumbers.some(
-                num => num && (cleanSender === num || cleanSender.includes(num))
+            const isOwnerMessage = allOwnerNumbers.some(
+                num => num && cleanSender === num
             );
 
-            // 👑 React to owner/super-owner messages
+            // 👑 React ONLY to owner messages
             if (
-                isOwnerCrown &&
+                isOwnerMessage &&
                 isLiveNotify &&
-                kaif_origin !== 'status@broadcast' &&
-                kaif_msg?.key
+                kaif_msg?.key &&
+                kaif_origin !== 'status@broadcast'
             ) {
                 kaif_sock.sendMessage(kaif_origin, {
                     react: {
