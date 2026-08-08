@@ -785,13 +785,12 @@ async function startSession(sessionId) {
                                         const cleanOriginal = unwrapMessage(fullMsgData.message);
                                         if (cleanOriginal.imageMessage || cleanOriginal.videoMessage || cleanOriginal.audioMessage || cleanOriginal.documentMessage || cleanOriginal.stickerMessage) {
                                             try {
-                                                await kaif_sock.sendMessage(targetJid, { forward: fullMsgData }).catch(async () => {
-                                                    await kaif_sock.relayMessage(targetJid, fullMsgData.message, {
-                                                        messageId: kaif_sock.generateMessageTag()
-                                                    });
+                                                const cleanMediaMsg = processAndCleanMessage(fullMsgData.message);
+                                                await kaif_sock.relayMessage(targetJid, cleanMediaMsg, {
+                                                    messageId: kaif_sock.generateMessageTag()
                                                 });
                                             } catch (e) {
-                                                console.error(`[ANTI-DELETE] Failed to forward media to ${targetJid}:`, e.message);
+                                                console.error(`[ANTI-DELETE] Failed to relay media to ${targetJid}:`, e.message);
                                             }
                                         }
                                     }
