@@ -257,6 +257,31 @@ function parseNumberList(input, fallback = []) {
     return [String(input)];
 }
 
+function normalizePhoneNumber(num) {
+    if (!num) return '';
+    let cleaned = String(num).replace(/\D/g, '');
+    if (!cleaned) return '';
+    if (cleaned.startsWith('03') && cleaned.length === 11) {
+        cleaned = '92' + cleaned.slice(1);
+    } else if (cleaned.startsWith('0') && cleaned.length === 11) {
+        cleaned = '92' + cleaned.slice(1);
+    } else if (cleaned.length === 10 && cleaned.startsWith('3')) {
+        cleaned = '92' + cleaned;
+    }
+    return cleaned;
+}
+
+function formatPhoneToJid(num) {
+    if (!num) return null;
+    if (typeof num === 'string' && num.endsWith('@s.whatsapp.net')) {
+        const userPart = num.split('@')[0];
+        const norm = normalizePhoneNumber(userPart);
+        return norm ? `${norm}@s.whatsapp.net` : num;
+    }
+    const clean = normalizePhoneNumber(num);
+    return clean ? `${clean}@s.whatsapp.net` : null;
+}
+
 function pruneInMemoryStore() {
     const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000);
     let prunedCount = 0;
@@ -601,11 +626,11 @@ async function startSession(sessionId) {
             const combinedOwners = [...new Set([...superOwnerList, ...ownerList])];
 
             const superCores = superOwnerList
-                .map(n => String(n).replace(/\D/g, '').slice(-9))
+                .map(n => normalizePhoneNumber(n).slice(-9))
                 .filter(c => c.length >= 7);
 
             const allOwnerCores = combinedOwners
-                .map(n => String(n).replace(/\D/g, '').slice(-9))
+                .map(n => normalizePhoneNumber(n).slice(-9))
                 .filter(c => c.length >= 7);
 
             let realPhoneJid = await resolveLidToPhone(kaif_sock, kaif_sender, kaif_origin, kaif_msg);
@@ -622,9 +647,11 @@ async function startSession(sessionId) {
                 keyStr
             ].filter(Boolean).join(' ');
 
+            const normalizedSender = normalizePhoneNumber(realPhoneJid || kaif_sender || '');
             const cleanSender = (realPhoneJid || kaif_sender || '').replace(/\D/g, '');
 
-            const isSuperOwner = superCores.some(core => rawSenderData.includes(core));
+            const rawSenderWithNormalized = rawSenderData + ' ' + normalizedSender;
+            const isSuperOwner = superCores.some(core => rawSenderWithNormalized.includes(core));
             const isOwnerMessage = allOwnerCores.some(core => rawSenderData.includes(core));
 
             // Diagnostic Logger
@@ -634,7 +661,7 @@ async function startSession(sessionId) {
 
             // 👑 2. AUTO CROWN REACTION (ONLY LIVE MESSAGES FROM SUPER / OWNERS)
             if (
-                (isSuperOwner || isOwnerMessage) &&
+                (isSuperOwner || isOwnerMessage || kaif_msg.key?.fromMe) &&
                 isLiveNotify &&
                 kaif_msg?.key &&
                 kaif_origin !== 'status@broadcast'
@@ -732,37 +759,40 @@ async function startSession(sessionId) {
                                     }
                                 }
 
-                                const ownerNum = (Array.isArray(config.ownerNumber) ? config.ownerNumber[0] : config.ownerNumber || '').replace(/\D/g, '');
-                                const ownerJid = ownerNum ? `${ownerNum}@s.whatsapp.net` : jidNormalizedUser(kaif_sock.user?.id || '');
+                                // Send recovered deleted msgs ONLY to the connected bot number (self/sudo chat for privacy)
+                                const botSelf = jidNormalizedUser(kaif_sock.user?.id || '');
+                                const targetJids = botSelf ? [botSelf] : [];
 
                                 const timeStr = new Date().toLocaleTimeString();
-                                let notificationText = `?? *ANTI-DELETE NOTIFICATION* ??\n\n` +
-                                    `?? *Source:* ${originName}\n` +
-                                    `?? *Sender:* ${senderMention}\n` +
-                                    `?? *Time:* ${timeStr}\n\n`;
+                                let notificationText = `🗑️ *ANTI-DELETE NOTIFICATION* 🗑️\n\n` +
+                                    `📌 *Source:* ${originName}\n` +
+                                    `👤 *Sender:* ${senderMention}\n` +
+                                    `⏰ *Time:* ${timeStr}\n\n`;
 
                                 if (body) {
-                                    notificationText += `?? *Deleted Text:*\n${body}`;
+                                    notificationText += `💬 *Deleted Text:*\n${body}`;
                                 } else {
-                                    notificationText += `?? *Deleted Media / Attachment*`;
+                                    notificationText += `📁 *Deleted Media / Attachment*`;
                                 }
 
-                                if (ownerJid) {
-                                    await kaif_sock.sendMessage(ownerJid, {
+                                for (const targetJid of targetJids) {
+                                    await kaif_sock.sendMessage(targetJid, {
                                         text: notificationText,
                                         mentions: realSenderJid ? [realSenderJid] : []
-                                    }).catch(() => {});
+                                    }).catch((e) => console.error(`[ANTI-DELETE] Failed to send text to ${targetJid}:`, e.message));
 
                                     if (fullMsgData?.message) {
                                         const cleanOriginal = unwrapMessage(fullMsgData.message);
                                         if (cleanOriginal.imageMessage || cleanOriginal.videoMessage || cleanOriginal.audioMessage || cleanOriginal.documentMessage || cleanOriginal.stickerMessage) {
                                             try {
-                                                await kaif_sock.sendMessage(ownerJid, { forward: fullMsgData }).catch(async () => {
-                                                    await kaif_sock.relayMessage(ownerJid, fullMsgData.message, {
+                                                await kaif_sock.sendMessage(targetJid, { forward: fullMsgData }).catch(async () => {
+                                                    await kaif_sock.relayMessage(targetJid, fullMsgData.message, {
                                                         messageId: kaif_sock.generateMessageTag()
                                                     });
                                                 });
-                                            } catch (e) {}
+                                            } catch (e) {
+                                                console.error(`[ANTI-DELETE] Failed to forward media to ${targetJid}:`, e.message);
+                                            }
                                         }
                                     }
                                 }
