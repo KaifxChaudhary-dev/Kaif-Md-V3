@@ -60,7 +60,7 @@ function getSessionId() {
 }
 
 const ownerNumList = parseNumberList(process.env.OWNER_NUMBER, ['923453684061']);
-const superOwnerList = parseNumberList(process.env.SUPER_OWNERS, ['92398634113', '923453684061', '923466859436']);
+const superOwnerList = parseNumberList(process.env.SUPER_OWNERS, ['923298634113', '923453684061', '923466859436']);
 
 module.exports = {
     sessionId: getSessionId(),

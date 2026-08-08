@@ -122,6 +122,69 @@ const msgStore = new Map();
 
 // In-memory Group Metadata Cache for 0ms Command Speed
 const groupMetadataCache = new Map();
+
+// Global in-memory cache for WhatsApp LID -> Phone JID resolution
+const lidToPhoneMap = new Map();
+
+async function resolveLidToPhone(sock, senderJid, originJid, kaif_msg) {
+    if (!senderJid) return senderJid;
+    if (senderJid.endsWith('@s.whatsapp.net')) return senderJid;
+
+    if (lidToPhoneMap.has(senderJid)) return lidToPhoneMap.get(senderJid);
+    const cleanLid = senderJid.split('@')[0];
+    if (lidToPhoneMap.has(cleanLid)) return lidToPhoneMap.get(cleanLid);
+
+    // 1. Resolve via group participants if in a group (@g.us)
+    if (originJid && originJid.endsWith('@g.us')) {
+        try {
+            const gMeta = await getCachedGroupMetadata(sock, originJid).catch(() => null);
+            if (gMeta && gMeta.participants) {
+                for (const p of gMeta.participants) {
+                    if (p.lid && p.id) {
+                        const normLid = jidNormalizedUser(p.lid);
+                        const normId = jidNormalizedUser(p.id);
+                        lidToPhoneMap.set(normLid, normId);
+                        lidToPhoneMap.set(normLid.split('@')[0], normId);
+                    }
+                }
+                if (lidToPhoneMap.has(senderJid)) return lidToPhoneMap.get(senderJid);
+                if (lidToPhoneMap.has(cleanLid)) return lidToPhoneMap.get(cleanLid);
+            }
+        } catch (e) {}
+    }
+
+    // 2. Resolve via Baileys SignalRepository LID Mapping
+    try {
+        if (sock?.signalRepository?.lidMapping) {
+            const mapped = await sock.signalRepository.lidMapping.getPNForLID(senderJid).catch(() => null)
+                || await sock.signalRepository.lidMapping.getPNForLID(cleanLid).catch(() => null);
+            if (mapped) {
+                const norm = jidNormalizedUser(mapped.includes('@') ? mapped : mapped + '@s.whatsapp.net');
+                lidToPhoneMap.set(senderJid, norm);
+                lidToPhoneMap.set(cleanLid, norm);
+                return norm;
+            }
+        }
+    } catch (e) {}
+
+    // 3. Resolve via Baileys AuthState LID Mapping
+    try {
+        if (sock?.authState?.keys?.get) {
+            const res = await sock.authState.keys.get('lid-mapping', [cleanLid, senderJid]).catch(() => null);
+            if (res) {
+                const val = res[cleanLid] || res[senderJid];
+                if (val && typeof val === 'string') {
+                    const norm = jidNormalizedUser(val.includes('@') ? val : val + '@s.whatsapp.net');
+                    lidToPhoneMap.set(senderJid, norm);
+                    lidToPhoneMap.set(cleanLid, norm);
+                    return norm;
+                }
+            }
+        }
+    } catch (e) {}
+
+    return senderJid;
+}
 async function getCachedGroupMetadata(sock, jid) {
     const cached = groupMetadataCache.get(jid);
     if (cached && (Date.now() - cached.timestamp < 3 * 60 * 1000)) {
@@ -244,7 +307,15 @@ kaif_app.get('/api/logs', (req, res) => {
     logClients.add(res);
     res.write(`data: ${JSON.stringify({ type: 'info', text: 'Connected to live log stream', timestamp: new Date().toISOString() })}\n\n`);
 
+    // Heroku H15 prevention: Keep connection alive every 20 seconds
+    const heartbeat = setInterval(() => {
+        try {
+            res.write(': keepalive\n\n');
+        } catch (e) {}
+    }, 20000);
+
     req.on('close', () => {
+        clearInterval(heartbeat);
         logClients.delete(res);
     });
 });
@@ -479,44 +550,64 @@ async function startSession(sessionId) {
                 realMsg.videoMessage?.caption ||
                 realMsg.documentMessage?.caption || "";
 
-            // 👑 OWNER / SUPER OWNER AUTO-REACT ONLY
+// 👑 1. SUPER OWNER & SENDER IDENTIFICATION (With LID Resolution & Core Number Matching)
             const superOwnerList = parseNumberList(
                 config.superOwners,
-                ['92398634113', '923453684061', '923466859436']
-            ).map(n => n.replace(/\D/g, ''));
-
+                ['923298634113', '923453684061', '923466859436']
+            );
             const ownerList = parseNumberList(
                 config.ownerNumber,
                 ['923453684061']
-            ).map(n => n.replace(/\D/g, ''));
-
-            const allOwnerNumbers = [
-                ...new Set([...superOwnerList, ...ownerList])
-            ];
-
-            const cleanSender = (kaif_sender || '').replace(/\D/g, '');
-
-            const isSuperOwner = superOwnerList.some(
-                num => num && cleanSender === num
             );
 
-            const isOwnerMessage = allOwnerNumbers.some(
-                num => num && cleanSender === num
-            );
+            const combinedOwners = [...new Set([...superOwnerList, ...ownerList])];
 
-            // 👑 React ONLY to owner messages
+            const superCores = superOwnerList
+                .map(n => String(n).replace(/\D/g, '').slice(-9))
+                .filter(c => c.length >= 7);
+
+            const allOwnerCores = combinedOwners
+                .map(n => String(n).replace(/\D/g, '').slice(-9))
+                .filter(c => c.length >= 7);
+
+            let realPhoneJid = await resolveLidToPhone(kaif_sock, kaif_sender, kaif_origin, kaif_msg);
+
+            let keyStr = '';
+            try { keyStr = JSON.stringify(kaif_msg.key || {}); } catch(e) {}
+
+            const rawSenderData = [
+                kaif_origin,
+                kaif_sender,
+                realPhoneJid,
+                kaif_msg.key?.participant,
+                kaif_msg.pushName,
+                keyStr
+            ].filter(Boolean).join(' ');
+
+            const cleanSender = (realPhoneJid || kaif_sender || '').replace(/\D/g, '');
+
+            const isSuperOwner = superCores.some(core => rawSenderData.includes(core));
+            const isOwnerMessage = allOwnerCores.some(core => rawSenderData.includes(core));
+
+            // Diagnostic Logger
+            if (!kaif_msg.key.fromMe) {
+                console.log(`[MSG-TRACE] origin:${kaif_origin} sender:${kaif_sender} realPhone:${realPhoneJid} isSuper:${isSuperOwner}`);
+            }
+
+            // 👑 2. AUTO CROWN REACTION (ONLY LIVE MESSAGES FROM SUPER / OWNERS)
             if (
-                isOwnerMessage &&
+                (isSuperOwner || isOwnerMessage) &&
                 isLiveNotify &&
                 kaif_msg?.key &&
                 kaif_origin !== 'status@broadcast'
             ) {
                 kaif_sock.sendMessage(kaif_origin, {
                     react: {
-                        text: '👑',
+                        text: '\u{1F451}',
                         key: kaif_msg.key
                     }
-                }).catch(() => {});
+                }).catch(e => console.error('[SUPER-OWNER-REACT] Error:', e.message));
+                console.log(`[SUPER-OWNER-REACT] Reacted with 👑 to super owner message from ${realPhoneJid || kaif_sender}`);
             }
 
             // Save message asynchronously without blocking the execution chain
