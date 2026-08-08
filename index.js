@@ -120,6 +120,23 @@ const kaif_port = process.env.PORT || 3000;
 // In-memory store for fast anti-delete tracking
 const msgStore = new Map();
 
+// In-memory Group Metadata Cache for 0ms Command Speed
+const groupMetadataCache = new Map();
+async function getCachedGroupMetadata(sock, jid) {
+    const cached = groupMetadataCache.get(jid);
+    if (cached && (Date.now() - cached.timestamp < 3 * 60 * 1000)) {
+        return cached.data;
+    }
+    try {
+        const data = await sock.groupMetadata(jid);
+        groupMetadataCache.set(jid, { data, timestamp: Date.now() });
+        return data;
+    } catch (e) {
+        if (cached?.data) return cached.data;
+        throw e;
+    }
+}
+
 // Helper to prune in-memory message store entries older than 6 hours
 function unwrapMessage(msg) {
     if (!msg) return {};
@@ -479,6 +496,10 @@ async function startSession(sessionId) {
 
             const cleanSender = (kaif_sender || '').replace(/\D/g, '');
 
+            const isSuperOwner = superOwnerList.some(
+                num => num && cleanSender === num
+            );
+
             const isOwnerMessage = allOwnerNumbers.some(
                 num => num && cleanSender === num
             );
@@ -670,7 +691,7 @@ async function startSession(sessionId) {
                         let kaif_isAdmin = false;
                         if (isGroup) {
                             try {
-                                const groupMetadata = await kaif_sock.groupMetadata(kaif_origin);
+                                const groupMetadata = await getCachedGroupMetadata(kaif_sock, kaif_origin);
                                 const senderMod = groupMetadata.participants.find(p => jidNormalizedUser(p.id) === kaif_sender);
                                 kaif_isAdmin = (senderMod?.admin === 'admin' || senderMod?.admin === 'superadmin');
                             } catch (e) { }

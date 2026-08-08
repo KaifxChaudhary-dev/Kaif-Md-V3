@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 const { BufferJSON, initAuthCreds } = require('@whiskeysockets/baileys');
 
 // Define Schema for Auth with bufferCommands: false to prevent process crash if DB disconnects
@@ -10,6 +10,9 @@ const AuthStateSchema = new mongoose.Schema({
     bufferCommands: false,
     autoCreate: true
 });
+
+// Fast In-Memory Cache for 0ms Auth Key Access
+const keyCache = new Map();
 
 const useMongoDBAuthState = async (sessionId = 'kaif_session') => {
     if (mongoose.connection.readyState !== 1) {
@@ -31,6 +34,7 @@ const useMongoDBAuthState = async (sessionId = 'kaif_session') => {
     }
 
     const writeData = async (data, id) => {
+        keyCache.set(id, data);
         try {
             if (mongoose.connection.readyState !== 1) return;
             const stringifiedData = JSON.stringify(data, BufferJSON.replacer);
@@ -45,14 +49,19 @@ const useMongoDBAuthState = async (sessionId = 'kaif_session') => {
     };
 
     const readData = async (id) => {
+        if (keyCache.has(id)) {
+            return keyCache.get(id);
+        }
         try {
             if (mongoose.connection.readyState !== 1) return null;
             const result = await AuthState.findById(id);
             if (result && result.data) {
+                let parsed = result.data;
                 if (typeof result.data === 'string') {
-                    return JSON.parse(result.data, BufferJSON.reviver);
+                    parsed = JSON.parse(result.data, BufferJSON.reviver);
                 }
-                return result.data;
+                keyCache.set(id, parsed);
+                return parsed;
             }
             return null;
         } catch (error) {
@@ -62,6 +71,7 @@ const useMongoDBAuthState = async (sessionId = 'kaif_session') => {
     };
 
     const removeData = async (id) => {
+        keyCache.delete(id);
         try {
             if (mongoose.connection.readyState !== 1) return;
             await AuthState.findByIdAndDelete(id);
@@ -73,6 +83,7 @@ const useMongoDBAuthState = async (sessionId = 'kaif_session') => {
     const creds = (await readData('creds')) || initAuthCreds();
 
     const clearAllData = async () => {
+        keyCache.clear();
         try {
             if (mongoose.connection.readyState !== 1) return;
             await AuthState.deleteMany({});
