@@ -196,8 +196,8 @@ async function getCachedBotConfig(sessionId) {
         return cached.data;
     }
     try {
-        const data = await getCachedBotConfig(sessionId);
-        botConfigCacheMap.set(sessionId, { data, timestamp: Date.now() });
+        const data = await kaif_getBotConfig(sessionId);
+        if (data) botConfigCacheMap.set(sessionId, { data, timestamp: Date.now() });
         return data;
     } catch (e) {
         return cached ? cached.data : null;
@@ -210,8 +210,8 @@ async function getCachedGlobalAutoForward(sessionId) {
         return cached.data;
     }
     try {
-        const data = await getCachedGlobalAutoForward(sessionId);
-        globalAutoForwardCacheMap.set(sessionId, { data, timestamp: Date.now() });
+        const data = await kaif_getGlobalAutoForward(sessionId);
+        if (data) globalAutoForwardCacheMap.set(sessionId, { data, timestamp: Date.now() });
         return data;
     } catch (e) {
         return cached ? cached.data : null;
@@ -221,6 +221,65 @@ async function getCachedGlobalAutoForward(sessionId) {
 function invalidateConfigCaches(sessionId) {
     botConfigCacheMap.delete(sessionId);
     globalAutoForwardCacheMap.delete(sessionId);
+}
+
+// -----------------------------------------------------------------------------
+// FIFO AUTO-FORWARD QUEUE & DEDUPLICATION (PREVENTS SCRAMBLED BULK FORWARDING)
+// -----------------------------------------------------------------------------
+const processedAutoForwardMsgSet = new Set();
+const autoForwardQueue = [];
+let isProcessingAutoForwardQueue = false;
+
+async function processAutoForwardQueue() {
+    if (isProcessingAutoForwardQueue || autoForwardQueue.length === 0) return;
+    isProcessingAutoForwardQueue = true;
+
+    while (autoForwardQueue.length > 0) {
+        const task = autoForwardQueue.shift();
+        const { kaif_sock, targetJids, relayMsg, kaif_origin, msgId } = task;
+
+        for (const targetJid of targetJids) {
+            if (!targetJid) continue;
+            const cleanTarget = targetJid.trim().toLowerCase();
+            const cleanOrigin = kaif_origin.trim().toLowerCase();
+
+            // Prevent forwarding back to the origin source chat
+            if (cleanTarget === cleanOrigin) continue;
+
+            // Prevent loopback if digits match (for user JIDs)
+            const tDigits = cleanTarget.replace(/\D/g, '');
+            const oDigits = cleanOrigin.replace(/\D/g, '');
+            if (tDigits && oDigits && tDigits === oDigits && !cleanTarget.endsWith('@g.us') && !cleanTarget.endsWith('@newsletter')) {
+                continue;
+            }
+
+            try {
+                await kaif_sock.relayMessage(cleanTarget, relayMsg, {
+                    messageId: kaif_sock.generateMessageTag()
+                });
+                console.log(`🚀 [GLOBAL-FORWARD] Forwarded message ${msgId || ''} from ${kaif_origin} to ${cleanTarget}`);
+            } catch (err) {
+                console.error(`[GLOBAL-FORWARD] Failed for ${cleanTarget}:`, err.message);
+            }
+
+            if (targetJids.length > 1) {
+                await new Promise(r => setTimeout(r, 200));
+            }
+        }
+
+        // Inter-message delay (600ms) to ensure strict order and prevent WhatsApp rate limiting
+        await new Promise(r => setTimeout(r, 600));
+    }
+
+    isProcessingAutoForwardQueue = false;
+}
+
+function enqueueAutoForward(item) {
+    autoForwardQueue.push(item);
+    processAutoForwardQueue().catch(err => {
+        console.error('[AUTO-FORWARD-QUEUE] Processing error:', err.message);
+        isProcessingAutoForwardQueue = false;
+    });
 }
 async function getCachedGroupMetadata(sock, jid) {
     const cached = groupMetadataCache.get(jid);
@@ -805,59 +864,82 @@ async function startSession(sessionId) {
 
             // 1. GLOBAL AUTO FORWARD LOGIC
             try {
-                const globalCfg = await getCachedGlobalAutoForward(sessionId);
-                if (globalCfg?.enabled && globalCfg.targetJids?.length > 0) {
-                    const isSourceMatched = (!globalCfg.sourceJids || globalCfg.sourceJids.length === 0) ||
-                        globalCfg.sourceJids.some(s => {
-                            if (!s) return false;
-                            if (s === kaif_origin) return true;
-                            const sDigits = s.replace(/\D/g, '');
-                            const oDigits = kaif_origin.replace(/\D/g, '');
-                            return sDigits && oDigits && sDigits === oDigits;
-                        });
+                // Ignore bot's own sent messages to avoid forwarding loops
+                if (!kaif_msg.key?.fromMe && kaif_origin !== 'status@broadcast') {
+                    const globalCfg = await getCachedGlobalAutoForward(sessionId);
+                    if (globalCfg?.enabled && globalCfg.targetJids?.length > 0) {
+                        const msgId = kaif_msg.key?.id;
+                        if (msgId && processedAutoForwardMsgSet.has(msgId)) {
+                            // Already queued / processed
+                        } else {
+                            const isSourceMatched = (!globalCfg.sourceJids || globalCfg.sourceJids.length === 0) ||
+                                globalCfg.sourceJids.some(s => {
+                                    if (!s) return false;
+                                    const cleanS = s.trim().toLowerCase();
+                                    const cleanO = kaif_origin.trim().toLowerCase();
+                                    if (cleanS === cleanO) return true;
 
-                    if (isSourceMatched) {
-                        let customRegexList = [];
-                        if (globalCfg.oldTextRegex && Array.isArray(globalCfg.oldTextRegex)) {
-                            customRegexList = globalCfg.oldTextRegex.map(pattern => {
-                                try {
-                                    if (!pattern.trim()) return null;
-                                    const escaped = pattern.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                                    return new RegExp(escaped, 'gu');
-                                } catch (e) { return null; }
-                            }).filter(Boolean);
-                        }
+                                    if (kaif_sender && cleanS === kaif_sender.trim().toLowerCase()) return true;
+                                    if (realPhoneJid && cleanS === realPhoneJid.trim().toLowerCase()) return true;
 
-                        let relayMsg = processAndCleanMessage(kaif_msg.message, customRegexList, globalCfg.newText || "");
+                                    const sDigits = cleanS.replace(/\D/g, '');
+                                    const oDigits = cleanO.replace(/\D/g, '');
+                                    if (sDigits && oDigits && sDigits === oDigits) return true;
 
-                        // Media type filtering check based on Dashboard settings
-                        let shouldForward = true;
-                        if (relayMsg.imageMessage && globalCfg.forwardPicture === false) shouldForward = false;
-                        else if (relayMsg.videoMessage && globalCfg.forwardVideo === false) shouldForward = false;
-                        else if (relayMsg.audioMessage && globalCfg.forwardAudio === false) shouldForward = false;
-                        else if (relayMsg.documentMessage && globalCfg.forwardDocument === false) shouldForward = false;
-                        else if ((relayMsg.conversation || relayMsg.extendedTextMessage) && globalCfg.forwardText === false) shouldForward = false;
+                                    const pDigits = (realPhoneJid || kaif_sender || '').replace(/\D/g, '');
+                                    if (sDigits && pDigits && sDigits === pDigits) return true;
 
-                        if (shouldForward) {
-                            if (globalCfg.autoForwardTimestamp) {
-                                const timeStr = `\n\n_[${new Date().toLocaleTimeString()}]_`;
-                                if (relayMsg.conversation) relayMsg.conversation += timeStr;
-                                else if (relayMsg.extendedTextMessage?.text) relayMsg.extendedTextMessage.text += timeStr;
-                                else if (relayMsg.imageMessage) relayMsg.imageMessage.caption = (relayMsg.imageMessage.caption || "") + timeStr;
-                                else if (relayMsg.videoMessage) relayMsg.videoMessage.caption = (relayMsg.videoMessage.caption || "") + timeStr;
-                                else if (relayMsg.documentMessage) relayMsg.documentMessage.caption = (relayMsg.documentMessage.caption || "") + timeStr;
-                            }
+                                    return false;
+                                });
 
-                            for (const targetJid of globalCfg.targetJids) {
-                                if (targetJid === kaif_origin) continue; // Prevent loop back to source
-                                try {
-                                    await kaif_sock.relayMessage(targetJid, relayMsg, {
-                                        messageId: kaif_sock.generateMessageTag()
+                            if (isSourceMatched) {
+                                if (msgId) {
+                                    processedAutoForwardMsgSet.add(msgId);
+                                    if (processedAutoForwardMsgSet.size > 1000) {
+                                        const firstVal = processedAutoForwardMsgSet.values().next().value;
+                                        processedAutoForwardMsgSet.delete(firstVal);
+                                    }
+                                }
+
+                                let customRegexList = [];
+                                if (globalCfg.oldTextRegex && Array.isArray(globalCfg.oldTextRegex)) {
+                                    customRegexList = globalCfg.oldTextRegex.map(pattern => {
+                                        try {
+                                            if (!pattern || !pattern.trim()) return null;
+                                            const escaped = pattern.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                            return new RegExp(escaped, 'gu');
+                                        } catch (e) { return null; }
+                                    }).filter(Boolean);
+                                }
+
+                                let relayMsg = processAndCleanMessage(kaif_msg.message, customRegexList, globalCfg.newText || "");
+
+                                // Media type filtering check based on Dashboard settings
+                                let shouldForward = true;
+                                if (relayMsg.imageMessage && globalCfg.forwardPicture === false) shouldForward = false;
+                                else if (relayMsg.videoMessage && globalCfg.forwardVideo === false) shouldForward = false;
+                                else if (relayMsg.audioMessage && globalCfg.forwardAudio === false) shouldForward = false;
+                                else if (relayMsg.documentMessage && globalCfg.forwardDocument === false) shouldForward = false;
+                                else if ((relayMsg.conversation || relayMsg.extendedTextMessage) && globalCfg.forwardText === false) shouldForward = false;
+
+                                if (shouldForward) {
+                                    if (globalCfg.autoForwardTimestamp) {
+                                        const timeStr = `\n\n_[${new Date().toLocaleTimeString()}]_`;
+                                        if (relayMsg.conversation) relayMsg.conversation += timeStr;
+                                        else if (relayMsg.extendedTextMessage?.text) relayMsg.extendedTextMessage.text += timeStr;
+                                        else if (relayMsg.imageMessage) relayMsg.imageMessage.caption = (relayMsg.imageMessage.caption || "") + timeStr;
+                                        else if (relayMsg.videoMessage) relayMsg.videoMessage.caption = (relayMsg.videoMessage.caption || "") + timeStr;
+                                        else if (relayMsg.documentMessage) relayMsg.documentMessage.caption = (relayMsg.documentMessage.caption || "") + timeStr;
+                                    }
+
+                                    // Enqueue in sequential FIFO queue for strict ordering and rate limiting
+                                    enqueueAutoForward({
+                                        kaif_sock,
+                                        targetJids: globalCfg.targetJids,
+                                        relayMsg,
+                                        kaif_origin,
+                                        msgId
                                     });
-                                    console.log(`🚀 [GLOBAL-FORWARD] Forwarded message from ${kaif_origin} to ${targetJid}`);
-                                    await new Promise(r => setTimeout(r, 100));
-                                } catch (err) {
-                                    console.error(`[GLOBAL-FORWARD] Failed for ${targetJid}:`, err.message);
                                 }
                             }
                         }
