@@ -21,6 +21,7 @@ A powerful, light, and high-performance WhatsApp bot focused on **Auto-Forwardin
 
 | Command | Aliases | Category | Description |
 | ------- | ------- | -------- | ----------- |
+| `.owner` | — | Contact | To Contact owner for help |
 | `.af` | `.autoforward`, `.autofwd` | AutoForward | Configure auto-forwarding for specific groups or global targets |
 | `.f` | `.forward` | Tools | Manually forward a replied message to one or multiple target JIDs |
 | `.gjids` | `.gjid`, `.groups` | Tools | List all participating groups with member counts and unique JIDs |
