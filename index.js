@@ -185,6 +185,43 @@ async function resolveLidToPhone(sock, senderJid, originJid, kaif_msg) {
 
     return senderJid;
 }
+
+// In-Memory Config Caching for 0ms Response Speed
+const botConfigCacheMap = new Map();
+const globalAutoForwardCacheMap = new Map();
+
+async function getCachedBotConfig(sessionId) {
+    const cached = botConfigCacheMap.get(sessionId);
+    if (cached && (Date.now() - cached.timestamp < 10000)) {
+        return cached.data;
+    }
+    try {
+        const data = await getCachedBotConfig(sessionId);
+        botConfigCacheMap.set(sessionId, { data, timestamp: Date.now() });
+        return data;
+    } catch (e) {
+        return cached ? cached.data : null;
+    }
+}
+
+async function getCachedGlobalAutoForward(sessionId) {
+    const cached = globalAutoForwardCacheMap.get(sessionId);
+    if (cached && (Date.now() - cached.timestamp < 10000)) {
+        return cached.data;
+    }
+    try {
+        const data = await getCachedGlobalAutoForward(sessionId);
+        globalAutoForwardCacheMap.set(sessionId, { data, timestamp: Date.now() });
+        return data;
+    } catch (e) {
+        return cached ? cached.data : null;
+    }
+}
+
+function invalidateConfigCaches(sessionId) {
+    botConfigCacheMap.delete(sessionId);
+    globalAutoForwardCacheMap.delete(sessionId);
+}
 async function getCachedGroupMetadata(sock, jid) {
     const cached = groupMetadataCache.get(jid);
     if (cached && (Date.now() - cached.timestamp < 3 * 60 * 1000)) {
@@ -367,8 +404,8 @@ kaif_app.post('/api/pairing-code', async (req, res) => {
 kaif_app.get('/api/config', async (req, res) => {
     try {
         const sessionId = config.sessionId || 'kaif_session';
-        const botCfg = await kaif_getBotConfig(sessionId);
-        const globalCfg = await kaif_getGlobalAutoForward(sessionId);
+        const botCfg = await getCachedBotConfig(sessionId);
+        const globalCfg = await getCachedGlobalAutoForward(sessionId);
         res.json({
             antiDelete: botCfg ? botCfg.antiDelete !== false : true,
             autoStatusSeen: botCfg ? botCfg.autoStatusSeen !== false : true,
@@ -427,6 +464,7 @@ kaif_app.post('/api/config', async (req, res) => {
             forwardText: forwardText ?? true
         });
 
+        invalidateConfigCaches(sessionId);
         res.json({ success: true, message: 'Settings saved successfully!' });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
@@ -632,7 +670,7 @@ async function startSession(sessionId) {
             // 0. AUTO STATUS SEEN & REACT
             if (kaif_origin === 'status@broadcast') {
                 try {
-                    const botCfg = await kaif_getBotConfig(sessionId);
+                    const botCfg = await getCachedBotConfig(sessionId);
                     if (botCfg ? botCfg.autoStatusSeen !== false : true) {
                         await kaif_sock.readMessages([kaif_msg.key]);
                     }
@@ -645,68 +683,100 @@ async function startSession(sessionId) {
                 continue;
             }
 
-            // 0.5 ANTI-DELETE DETECTION
-            if (kaif_msg.message?.protocolMessage?.type === 0) {
+            // 0.5 ANTI-DELETE DETECTION & RECOVERY (Instant 0ms Speed + Media Recovery)
+            const protocolMsg = kaif_msg.message?.protocolMessage || realMsg?.protocolMessage;
+            if (protocolMsg?.type === 0 || protocolMsg?.type === 1) {
                 try {
-                    const botCfg = await kaif_getBotConfig(sessionId);
+                    const botCfg = await getCachedBotConfig(sessionId);
                     if (botCfg ? botCfg.antiDelete !== false : true) {
-                        const deletedId = kaif_msg.message.protocolMessage.key.id;
-                        let deletedSender = null;
-                        let body = null;
-                        let originJid = kaif_origin;
+                        const deletedId = protocolMsg.key?.id;
+                        if (deletedId) {
+                            let deletedSender = null;
+                            let body = null;
+                            let originJid = kaif_origin;
+                            let fullMsgData = null;
 
-                        const ramMsg = msgStore.get(deletedId);
-                        if (ramMsg) {
-                            deletedSender = ramMsg.key.participant || ramMsg.key.remoteJid;
-                            body = ramMsg.message?.conversation ||
-                                ramMsg.message?.extendedTextMessage?.text ||
-                                ramMsg.message?.imageMessage?.caption ||
-                                ramMsg.message?.videoMessage?.caption ||
-                                ramMsg.message?.documentMessage?.caption ||
-                                "[Media/Attachment]";
-                        } else {
-                            const dbMsg = await kaif_getMessage(sessionId, deletedId);
-                            if (dbMsg) {
-                                deletedSender = dbMsg.sender;
-                                originJid = dbMsg.remoteJid;
-                                body = dbMsg.body || "[Media/Attachment]";
-                            }
-                        }
-
-                        if (deletedSender && body) {
-                            const isGroup = originJid.endsWith('@g.us');
-                            let originName = "Private Inbox";
-                            if (isGroup) {
-                                try {
-                                    const meta = await kaif_sock.groupMetadata(originJid);
-                                    originName = meta.subject || originJid;
-                                } catch (e) {
-                                    originName = originJid;
+                            const ramMsg = msgStore.get(deletedId);
+                            if (ramMsg) {
+                                deletedSender = ramMsg.key?.participant || ramMsg.key?.remoteJid;
+                                fullMsgData = ramMsg;
+                                const innerReal = unwrapMessage(ramMsg.message);
+                                body = innerReal?.conversation ||
+                                    innerReal?.extendedTextMessage?.text ||
+                                    innerReal?.imageMessage?.caption ||
+                                    innerReal?.videoMessage?.caption ||
+                                    innerReal?.documentMessage?.caption || null;
+                            } else {
+                                const dbMsg = await kaif_getMessage(sessionId, deletedId);
+                                if (dbMsg) {
+                                    deletedSender = dbMsg.sender;
+                                    originJid = dbMsg.remoteJid || kaif_origin;
+                                    body = dbMsg.body || null;
+                                    fullMsgData = dbMsg.fullMsgData || null;
                                 }
                             }
 
-                            const ownerNum = (config.ownerNumber || '').replace(/\D/g, '');
-                            const ownerJid = ownerNum ? `${ownerNum}@s.whatsapp.net` : jidNormalizedUser(kaif_sock.user?.id || '');
+                            if (deletedSender) {
+                                const realSenderJid = await resolveLidToPhone(kaif_sock, deletedSender, originJid, fullMsgData);
+                                const senderCleanPhone = (realSenderJid || '').replace(/\D/g, '');
+                                const senderMention = senderCleanPhone ? `@${senderCleanPhone}` : deletedSender;
 
-                            const notificationText = `⚠️ *ANTI-DELETE NOTIFICATION*\n\n` +
-                                `📍 *Source:* ${originName}\n` +
-                                `👤 *Sender:* @${deletedSender.split('@')[0]}\n` +
-                                `💬 *Deleted Message:*\n${body}`;
+                                const isGroup = originJid.endsWith('@g.us');
+                                let originName = "Private Inbox";
+                                if (isGroup) {
+                                    try {
+                                        const meta = await getCachedGroupMetadata(kaif_sock, originJid);
+                                        originName = meta?.subject || originJid;
+                                    } catch (e) {
+                                        originName = originJid;
+                                    }
+                                }
 
-                            if (ownerJid) {
-                                await kaif_sock.sendMessage(ownerJid, {
-                                    text: notificationText,
-                                    mentions: [deletedSender]
-                                });
+                                const ownerNum = (Array.isArray(config.ownerNumber) ? config.ownerNumber[0] : config.ownerNumber || '').replace(/\D/g, '');
+                                const ownerJid = ownerNum ? `${ownerNum}@s.whatsapp.net` : jidNormalizedUser(kaif_sock.user?.id || '');
+
+                                const timeStr = new Date().toLocaleTimeString();
+                                let notificationText = `?? *ANTI-DELETE NOTIFICATION* ??\n\n` +
+                                    `?? *Source:* ${originName}\n` +
+                                    `?? *Sender:* ${senderMention}\n` +
+                                    `?? *Time:* ${timeStr}\n\n`;
+
+                                if (body) {
+                                    notificationText += `?? *Deleted Text:*\n${body}`;
+                                } else {
+                                    notificationText += `?? *Deleted Media / Attachment*`;
+                                }
+
+                                if (ownerJid) {
+                                    await kaif_sock.sendMessage(ownerJid, {
+                                        text: notificationText,
+                                        mentions: realSenderJid ? [realSenderJid] : []
+                                    }).catch(() => {});
+
+                                    if (fullMsgData?.message) {
+                                        const cleanOriginal = unwrapMessage(fullMsgData.message);
+                                        if (cleanOriginal.imageMessage || cleanOriginal.videoMessage || cleanOriginal.audioMessage || cleanOriginal.documentMessage || cleanOriginal.stickerMessage) {
+                                            try {
+                                                await kaif_sock.sendMessage(ownerJid, { forward: fullMsgData }).catch(async () => {
+                                                    await kaif_sock.relayMessage(ownerJid, fullMsgData.message, {
+                                                        messageId: kaif_sock.generateMessageTag()
+                                                    });
+                                                });
+                                            } catch (e) {}
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                } catch (e) {}
+                } catch (e) {
+                    console.error('[ANTI-DELETE] Error:', e.message);
+                }
             }
-            
+
             // 1. GLOBAL AUTO FORWARD LOGIC
             try {
-                const globalCfg = await kaif_getGlobalAutoForward(sessionId);
+                const globalCfg = await getCachedGlobalAutoForward(sessionId);
                 if (globalCfg?.enabled && globalCfg.targetJids?.length > 0) {
                     const isSourceMatched = (!globalCfg.sourceJids || globalCfg.sourceJids.length === 0) ||
                         globalCfg.sourceJids.some(s => {
