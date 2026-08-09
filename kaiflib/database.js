@@ -213,6 +213,9 @@ async function kaif_updateBotConfig(sessionId, updates) {
     if (typeof global.invalidateConfigCaches === 'function') {
         global.invalidateConfigCaches(sessionId);
     }
+    if (typeof global.broadcastLog === 'function') {
+        global.broadcastLog('config_updated', 'Configuration updated');
+    }
     return true;
 }
 
@@ -366,6 +369,9 @@ async function kaif_updateGlobalAutoForward(sessionId, updates) {
 
     if (typeof global.invalidateConfigCaches === 'function') {
         global.invalidateConfigCaches(sessionId);
+    }
+    if (typeof global.broadcastLog === 'function') {
+        global.broadcastLog('config_updated', 'Configuration updated');
     }
     return true;
 }

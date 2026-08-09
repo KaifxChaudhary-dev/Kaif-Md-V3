@@ -873,6 +873,7 @@
         loadConfig();
         checkStatus();
         setInterval(checkStatus, 3000);
+        setInterval(() => loadConfig(false), 5000);
     
         // Live SSE Log Stream Reader with Auto-Reconnect
         function initLogStream() {
@@ -905,6 +906,11 @@
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'heartbeat') return;
+
+                        if (data.type === 'config_updated') {
+                            loadConfig(true);
+                            return;
+                        }
 
                         const line = document.createElement('div');
                         const timeStr = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();

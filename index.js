@@ -24,6 +24,7 @@ const broadcastLog = (type, text) => {
         }
     }
 };
+global.broadcastLog = broadcastLog;
 
 process.on('uncaughtException', (err) => {
     try {
@@ -565,6 +566,9 @@ kaif_app.post('/api/pairing-code', async (req, res) => {
 });
 
 kaif_app.get('/api/config', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     try {
         const sessionId = config.sessionId || 'kaif_session';
         const botCfg = await getCachedBotConfig(sessionId);
