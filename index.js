@@ -797,7 +797,7 @@ async function startSession(sessionId) {
                 continue;
             }
 
-            // 0.5 ADVANCED ANTI-DELETE DETECTION & RECOVERY
+            // 0.5 ADVANCED ANTI-DELETE DETECTION & RECOVERY (EXCLUSIVE OWNER PRIVATE DM)
             const protocolMsg = kaif_msg.message?.protocolMessage || realMsg?.protocolMessage;
             if (protocolMsg && (protocolMsg.type === 0 || protocolMsg.type === 1)) {
                 const keyToRevoke = protocolMsg.key;
@@ -873,36 +873,30 @@ async function startSession(sessionId) {
                                 if (originalPhone) mentions.push(originalSender);
                                 if (isGroup && deleterJid !== originalSender && deleterPhone) mentions.push(deleterJid);
 
-                                const destination = botCfg?.antiDeleteDestination || 'owner';
+                                // Exclusively route to Owner / Sudo Private Inbox DM
                                 const botSelf = jidNormalizedUser(kaif_sock.user?.id || '');
                                 const ownerJid = botSelf || (botCfg?.ownerJid || (botCfg?.ownerNumber ? botCfg.ownerNumber.replace(/\D/g, '') + '@s.whatsapp.net' : null));
 
-                                const destinationsToSend = [];
-                                if ((destination === 'owner' || destination === 'both') && ownerJid) {
-                                    destinationsToSend.push(ownerJid);
-                                }
-                                if ((destination === 'group' || destination === 'both') && isGroup) {
-                                    destinationsToSend.push(chatJid);
-                                }
-
-                                for (const destJid of destinationsToSend) {
+                                if (ownerJid) {
                                     try {
-                                        await kaif_sock.sendMessage(destJid, {
+                                        // 1. Send Recovery Header to Owner DM Only
+                                        await kaif_sock.sendMessage(ownerJid, {
                                             text: infoText,
                                             mentions
                                         });
 
+                                        // 2. Relay original message (Media or Text) to Owner DM Only
                                         if (fullMsgData?.message) {
                                             const cleanOriginal = unwrapMessage(fullMsgData.message);
                                             if (cleanOriginal.imageMessage || cleanOriginal.videoMessage || cleanOriginal.audioMessage || cleanOriginal.documentMessage || cleanOriginal.stickerMessage) {
                                                 const cleanMediaMsg = processAndCleanMessage(fullMsgData.message);
-                                                await kaif_sock.relayMessage(destJid, cleanMediaMsg, {
+                                                await kaif_sock.relayMessage(ownerJid, cleanMediaMsg, {
                                                     messageId: kaif_sock.generateMessageTag()
                                                 });
                                             }
                                         }
                                     } catch (e) {
-                                        console.error(`[ANTIDELETE] Failed sending recovery to ${destJid}:`, e.message);
+                                        console.error(`[ANTIDELETE] Failed sending recovery to owner inbox (${ownerJid}):`, e.message);
                                     }
                                 }
                             }

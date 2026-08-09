@@ -10,7 +10,7 @@ module.exports = {
     alias: ['antideleteview', 'anti-delete', 'antidelet'],
     aliases: ['antideleteview', 'anti-delete', 'antidelet'],
     category: 'Settings',
-    desc: 'Toggle Anti Delete & Configure Destination (owner/group/both)',
+    desc: 'Toggle Anti Delete (Private Owner DM Recovery Only)',
     kaif_handler: async (kaif_sock, kaif_origin, context) => {
         const { kaif_args, sessionId, kaif_isOwner, kaif_msg } = context;
 
@@ -21,12 +21,11 @@ module.exports = {
         }
 
         const action = kaif_args[0]?.toLowerCase();
-        const destArg = kaif_args[1]?.toLowerCase();
 
         if (action === 'on' || action === '1' || action === 'enable') {
             await kaif_updateBotConfig(sessionId, { antiDelete: true });
             return await kaif_sock.sendMessage(kaif_origin, {
-                text: '🛡️ *ANTI DELETE ENABLED*\n\n🟢 Deleted messages will be privately recovered and sent to your personal inbox.'
+                text: '🛡️ *ANTI DELETE ENABLED*\n\n🟢 All deleted messages will be recovered and sent exclusively to your private inbox.'
             }, { quoted: kaif_msg });
         }
 
@@ -37,33 +36,16 @@ module.exports = {
             }, { quoted: kaif_msg });
         }
 
-        if (action === 'dest' || action === 'destination') {
-            if (['owner', 'group', 'both'].includes(destArg)) {
-                await kaif_updateBotConfig(sessionId, { antiDeleteDestination: destArg, antiDelete: true });
-                return await kaif_sock.sendMessage(kaif_origin, {
-                    text: '🛡️ *ANTI DELETE DESTINATION UPDATED*\n\n🎯 Recovery target set to: *' + destArg.toUpperCase() + '*'
-                }, { quoted: kaif_msg });
-            } else {
-                return await kaif_sock.sendMessage(kaif_origin, {
-                    text: '💡 *Usage:* .antidelete dest [owner|group|both]'
-                }, { quoted: kaif_msg });
-            }
-        }
-
         const config = await kaif_getBotConfig(sessionId);
         const isEnabled = (config ? config.antiDelete !== false : true);
         const statusStr = isEnabled ? '🟢 *ACTIVE (ON)*' : '🔴 *INACTIVE (OFF)*';
-        const destStr = (config?.antiDeleteDestination || 'owner').toUpperCase();
 
         let helpText = '🛡️ *KAIF-MD V3 • ANTI DELETE MANAGER*\n\n' +
             '📌 *Status:* ' + statusStr + '\n' +
-            '🎯 *Destination:* *' + destStr + '*\n\n' +
+            '🔒 *Target Inbox:* *Owner / Sudo Private DM Only*\n\n' +
             '⚙️ *Commands:*\n' +
-            '• `.antidelete on` ── Enable Anti Delete\n' +
-            '• `.antidelete off` ── Disable Anti Delete\n' +
-            '• `.antidelete dest owner` ── Send to Owner DM\n' +
-            '• `.antidelete dest group` ── Send to Group Chat\n' +
-            '• `.antidelete dest both` ── Send to Both\n\n' +
+            '• `.antidelete on` ── Enable Private Inbox Recovery\n' +
+            '• `.antidelete off` ── Disable Anti Delete\n\n' +
             '*⚡ KAIF-MD-V3 AUTOMATION SUITE*';
 
         return await kaif_sock.sendMessage(kaif_origin, { text: helpText }, { quoted: kaif_msg });
