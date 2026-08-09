@@ -224,6 +224,56 @@ function invalidateConfigCaches(sessionId) {
 }
 
 /// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// SEQUENTIAL ANTI-DELETE QUEUE (PREVENTS MIXING OF TEXT & MEDIA)
+// -----------------------------------------------------------------------------
+const antiDeleteQueue = [];
+let isProcessingAntiDeleteQueue = false;
+
+async function processAntiDeleteQueue() {
+    if (isProcessingAntiDeleteQueue || antiDeleteQueue.length === 0) return;
+    isProcessingAntiDeleteQueue = true;
+
+    while (antiDeleteQueue.length > 0) {
+        const task = antiDeleteQueue.shift();
+        const { kaif_sock, ownerJid, infoText, mentions, fullMsgData } = task;
+
+        try {
+            // 1. Send Header for THIS specific message
+            await kaif_sock.sendMessage(ownerJid, {
+                text: infoText,
+                mentions
+            });
+
+            // 2. Relay media immediately for THIS specific message
+            if (fullMsgData?.message) {
+                const cleanOriginal = unwrapMessage(fullMsgData.message);
+                if (cleanOriginal.imageMessage || cleanOriginal.videoMessage || cleanOriginal.audioMessage || cleanOriginal.documentMessage || cleanOriginal.stickerMessage) {
+                    const cleanMediaMsg = processAndCleanMessage(fullMsgData.message);
+                    await kaif_sock.relayMessage(ownerJid, cleanMediaMsg, {
+                        messageId: kaif_sock.generateMessageTag()
+                    });
+                }
+            }
+
+            // 3. Small 350ms delay so WhatsApp app renders each Header + Media together in 1-to-1 order
+            await new Promise(resolve => setTimeout(resolve, 350));
+        } catch (e) {
+            console.error('[ANTIDELETE-QUEUE] Error sending recovery:', e.message);
+        }
+    }
+
+    isProcessingAntiDeleteQueue = false;
+}
+
+function enqueueAntiDelete(item) {
+    antiDeleteQueue.push(item);
+    processAntiDeleteQueue().catch(err => {
+        console.error('[ANTIDELETE-QUEUE] Queue execution error:', err.message);
+        isProcessingAntiDeleteQueue = false;
+    });
+}
+
 // INSTANT PARALLEL AUTO-FORWARD QUEUE & SANITIZED JID DISPATCH
 // -----------------------------------------------------------------------------
 function sanitizeJid(input) {
@@ -797,7 +847,7 @@ async function startSession(sessionId) {
                 continue;
             }
 
-            // 0.5 ADVANCED ANTI-DELETE DETECTION & RECOVERY (EXCLUSIVE OWNER PRIVATE DM)
+            // 0.5 ADVANCED ANTI-DELETE DETECTION & RECOVERY (SEQUENTIAL PRIVATE DM PAIRING)
             const protocolMsg = kaif_msg.message?.protocolMessage || realMsg?.protocolMessage;
             if (protocolMsg && (protocolMsg.type === 0 || protocolMsg.type === 1)) {
                 const keyToRevoke = protocolMsg.key;
@@ -873,31 +923,17 @@ async function startSession(sessionId) {
                                 if (originalPhone) mentions.push(originalSender);
                                 if (isGroup && deleterJid !== originalSender && deleterPhone) mentions.push(deleterJid);
 
-                                // Exclusively route to Owner / Sudo Private Inbox DM
                                 const botSelf = jidNormalizedUser(kaif_sock.user?.id || '');
                                 const ownerJid = botSelf || (botCfg?.ownerJid || (botCfg?.ownerNumber ? botCfg.ownerNumber.replace(/\D/g, '') + '@s.whatsapp.net' : null));
 
                                 if (ownerJid) {
-                                    try {
-                                        // 1. Send Recovery Header to Owner DM Only
-                                        await kaif_sock.sendMessage(ownerJid, {
-                                            text: infoText,
-                                            mentions
-                                        });
-
-                                        // 2. Relay original message (Media or Text) to Owner DM Only
-                                        if (fullMsgData?.message) {
-                                            const cleanOriginal = unwrapMessage(fullMsgData.message);
-                                            if (cleanOriginal.imageMessage || cleanOriginal.videoMessage || cleanOriginal.audioMessage || cleanOriginal.documentMessage || cleanOriginal.stickerMessage) {
-                                                const cleanMediaMsg = processAndCleanMessage(fullMsgData.message);
-                                                await kaif_sock.relayMessage(ownerJid, cleanMediaMsg, {
-                                                    messageId: kaif_sock.generateMessageTag()
-                                                });
-                                            }
-                                        }
-                                    } catch (e) {
-                                        console.error(`[ANTIDELETE] Failed sending recovery to owner inbox (${ownerJid}):`, e.message);
-                                    }
+                                    enqueueAntiDelete({
+                                        kaif_sock,
+                                        ownerJid,
+                                        infoText,
+                                        mentions,
+                                        fullMsgData
+                                    });
                                 }
                             }
                         }
