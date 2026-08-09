@@ -170,10 +170,15 @@ function kaif_isDbConnected() {
 }
 
 async function kaif_getBotConfig(sessionId) {
+    if (!sessionId) sessionId = 'kaif_session';
     if (botConfigCache.has(sessionId)) {
         return botConfigCache.get(sessionId);
     }
-    if (!isConnected) return null;
+    if (!isConnected) {
+        const defaultCfg = { antiDelete: true, autoStatusSeen: true, autoStatusReact: true };
+        botConfigCache.set(sessionId, defaultCfg);
+        return defaultCfg;
+    }
     try {
         const Model = getModel(sessionId, 'BotConfig');
         let config = await Model.findOne({});
@@ -190,20 +195,25 @@ async function kaif_getBotConfig(sessionId) {
 }
 
 async function kaif_updateBotConfig(sessionId, updates) {
-    if (botConfigCache.has(sessionId)) {
-        const current = botConfigCache.get(sessionId) || {};
-        botConfigCache.set(sessionId, { ...current, ...updates });
+    if (!sessionId) sessionId = 'kaif_session';
+    const current = botConfigCache.get(sessionId) || {};
+    const merged = { ...current, ...updates };
+    botConfigCache.set(sessionId, merged);
+
+    if (isConnected) {
+        try {
+            const Model = getModel(sessionId, 'BotConfig');
+            const updated = await Model.findOneAndUpdate({}, merged, { upsert: true, new: true });
+            if (updated) botConfigCache.set(sessionId, updated.toObject());
+        } catch (e) {
+            console.error('DB Error updateBotConfig:', e);
+        }
     }
-    if (!isConnected) return false;
-    try {
-        const Model = getModel(sessionId, 'BotConfig');
-        const updated = await Model.findOneAndUpdate({}, updates, { upsert: true, new: true });
-        if (updated) botConfigCache.set(sessionId, updated.toObject());
-        return true;
-    } catch (e) {
-        console.error('DB Error updateBotConfig:', e);
-        return false;
+
+    if (typeof global.invalidateConfigCaches === 'function') {
+        global.invalidateConfigCaches(sessionId);
     }
+    return true;
 }
 
 async function kaif_saveMessage(sessionId, msgData) {
@@ -285,18 +295,43 @@ async function kaif_updateGroupSettings(sessionId, jid, updates) {
 }
 
 async function kaif_getGlobalAutoForward(sessionId) {
+    if (!sessionId) sessionId = 'kaif_session';
     if (globalForwardCache.has(sessionId)) {
         return globalForwardCache.get(sessionId);
     }
-    if (!isConnected) return null;
+    if (!isConnected) {
+        const defaultCfg = {
+            enabled: false,
+            sourceJids: [],
+            targetJids: [],
+            oldTextRegex: process.env.OLD_TEXT_REGEX ? process.env.OLD_TEXT_REGEX.split(',').map(s => s.trim()).filter(Boolean) : [],
+            newText: process.env.NEW_TEXT || ""
+        };
+        globalForwardCache.set(sessionId, defaultCfg);
+        return defaultCfg;
+    }
     try {
         const Model = getModel(sessionId, 'GlobalAutoForward');
         let config = await Model.findOne({});
         if (!config) {
-            config = await Model.create({ enabled: false, sourceJids: [], targetJids: [] });
+            config = await Model.create({
+                enabled: false,
+                sourceJids: [],
+                targetJids: [],
+                oldTextRegex: process.env.OLD_TEXT_REGEX ? process.env.OLD_TEXT_REGEX.split(',').map(s => s.trim()).filter(Boolean) : [],
+                newText: process.env.NEW_TEXT || ""
+            });
         }
         const plainObj = config.toObject();
         globalForwardCache.set(sessionId, plainObj);
+
+        if (!process.env.OLD_TEXT_REGEX && plainObj.oldTextRegex && plainObj.oldTextRegex.length) {
+            process.env.OLD_TEXT_REGEX = plainObj.oldTextRegex.join(',');
+        }
+        if (!process.env.NEW_TEXT && plainObj.newText) {
+            process.env.NEW_TEXT = plainObj.newText;
+        }
+
         return plainObj;
     } catch (e) {
         console.error('DB Error getGlobalAutoForward:', e);
@@ -305,20 +340,34 @@ async function kaif_getGlobalAutoForward(sessionId) {
 }
 
 async function kaif_updateGlobalAutoForward(sessionId, updates) {
-    if (globalForwardCache.has(sessionId)) {
-        const current = globalForwardCache.get(sessionId) || {};
-        globalForwardCache.set(sessionId, { ...current, ...updates });
+    if (!sessionId) sessionId = 'kaif_session';
+    const current = globalForwardCache.get(sessionId) || {};
+    const merged = { ...current, ...updates };
+    globalForwardCache.set(sessionId, merged);
+
+    if (updates.oldTextRegex !== undefined) {
+        process.env.OLD_TEXT_REGEX = Array.isArray(updates.oldTextRegex)
+            ? updates.oldTextRegex.join(',')
+            : String(updates.oldTextRegex || '');
     }
-    if (!isConnected) return false;
-    try {
-        const Model = getModel(sessionId, 'GlobalAutoForward');
-        const updated = await Model.findOneAndUpdate({}, updates, { upsert: true, new: true });
-        if (updated) globalForwardCache.set(sessionId, updated.toObject());
-        return true;
-    } catch (e) {
-        console.error('DB Error updateGlobalAutoForward:', e);
-        return false;
+    if (updates.newText !== undefined) {
+        process.env.NEW_TEXT = String(updates.newText || '');
     }
+
+    if (isConnected) {
+        try {
+            const Model = getModel(sessionId, 'GlobalAutoForward');
+            const updated = await Model.findOneAndUpdate({}, merged, { upsert: true, new: true });
+            if (updated) globalForwardCache.set(sessionId, updated.toObject());
+        } catch (e) {
+            console.error('DB Error updateGlobalAutoForward:', e);
+        }
+    }
+
+    if (typeof global.invalidateConfigCaches === 'function') {
+        global.invalidateConfigCaches(sessionId);
+    }
+    return true;
 }
 
 module.exports = {

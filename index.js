@@ -222,6 +222,7 @@ function invalidateConfigCaches(sessionId) {
     botConfigCacheMap.delete(sessionId);
     globalAutoForwardCacheMap.delete(sessionId);
 }
+global.invalidateConfigCaches = invalidateConfigCaches;
 
 /// -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
