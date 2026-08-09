@@ -271,25 +271,39 @@ async function processAutoForwardQueue() {
             }
 
             try {
+                // Ensure 100% clean, un-labeled message (no forwarded tag, no channel branding)
                 const itemRelayMsg = JSON.parse(JSON.stringify(relayMsg));
-                const mType = Object.keys(itemRelayMsg).find(k => k.endsWith('Message') || k === 'conversation');
-                if (mType && itemRelayMsg[mType] && typeof itemRelayMsg[mType] === 'object') {
-                    itemRelayMsg[mType].contextInfo = {
-                        ...(itemRelayMsg[mType].contextInfo || {}),
-                        forwardingScore: 999,
-                        isForwarded: true,
-                        forwardedNewsletterMessageInfo: {
-                            newsletterJid: '120363419652241844@newsletter',
-                            newsletterName: 'KAIF-MD-V3',
-                            serverMessageId: -1
+                const targetBlocks = ['extendedTextMessage', 'imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'];
+                targetBlocks.forEach(block => {
+                    if (itemRelayMsg[block]) {
+                        if (itemRelayMsg[block].contextInfo) {
+                            delete itemRelayMsg[block].contextInfo.isForwarded;
+                            delete itemRelayMsg[block].contextInfo.forwardingScore;
+                            delete itemRelayMsg[block].contextInfo.forwardedNewsletterMessageInfo;
+                            delete itemRelayMsg[block].contextInfo.externalAdReply;
+                            delete itemRelayMsg[block].contextInfo.newsletterJid;
+                            delete itemRelayMsg[block].contextInfo.newsletterName;
+                            delete itemRelayMsg[block].contextInfo.newsletterServerMessageId;
+                            itemRelayMsg[block].contextInfo.isForwarded = false;
+                            itemRelayMsg[block].contextInfo.forwardingScore = 0;
                         }
-                    };
+                        delete itemRelayMsg[block].isForwarded;
+                        delete itemRelayMsg[block].forwardingScore;
+                    }
+                });
+
+                if (itemRelayMsg.contextInfo) {
+                    delete itemRelayMsg.contextInfo.isForwarded;
+                    delete itemRelayMsg.contextInfo.forwardingScore;
+                    delete itemRelayMsg.contextInfo.forwardedNewsletterMessageInfo;
+                    itemRelayMsg.contextInfo.isForwarded = false;
+                    itemRelayMsg.contextInfo.forwardingScore = 0;
                 }
 
                 await kaif_sock.relayMessage(cleanTarget, itemRelayMsg, {
                     messageId: kaif_sock.generateMessageTag()
                 });
-                console.log(`🚀 [GLOBAL-FORWARD] Instant forwarded message ${msgId || ''} from ${kaif_origin} to ${cleanTarget}`);
+                console.log(`🚀 [GLOBAL-FORWARD] Clean forwarded message ${msgId || ''} from ${kaif_origin} to ${cleanTarget}`);
             } catch (err) {
                 console.error(`[GLOBAL-FORWARD] Failed for ${cleanTarget}:`, err.message);
             }
