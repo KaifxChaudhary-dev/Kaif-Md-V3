@@ -1,6 +1,6 @@
 /**
  * ⚡ KAIF-MD-V3 ⚡
- * VIP Global Auto-Forward Plugin (Exact User Layout)
+ * VIP Global Auto-Forward Plugin (Compact Sleek UI)
  * Developed by Kaif (ixxkaif)
  */
 const { kaif_getGlobalAutoForward, kaif_updateGlobalAutoForward } = require('../kaiflib/database');
@@ -52,7 +52,7 @@ module.exports = {
 
         if (!kaif_isOwner && !kaif_isSudo && !kaif_isSuperOwner) {
             return await sock.sendMessage(from, { 
-                text: '┌──────────────────────────────────────────────┐\n│          ⛔ *PERMISSION DENIED*              │\n└──────────────────────────────────────────────┘\n\n⛔ *Owner / Sudo permission required.*' 
+                text: '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n⛔ *Owner / Sudo permission required.*' 
             }, { quoted: kaif_msg });
         }
 
@@ -65,21 +65,21 @@ module.exports = {
         if (action === 'on') {
             await kaif_updateGlobalAutoForward(sessionId, { enabled: true });
             return await sock.sendMessage(from, { 
-                text: '┌──────────────────────────────────────────────┐\n│          👑 *KAIF-MD-V3 AUTOMATION*          │\n│            *VIP GLOBAL FORWARDER*             │\n└──────────────────────────────────────────────┘\n\n🟢 *AUTO-FORWARDING ENABLED*\n⚡ Instant Zero-Delay Dispatch active.' 
+                text: '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n🟢 *ACTIVE*  ⚡ *INSTANT DISPATCH*' 
             }, { quoted: kaif_msg });
         }
 
         if (action === 'off') {
             await kaif_updateGlobalAutoForward(sessionId, { enabled: false });
             return await sock.sendMessage(from, { 
-                text: '┌──────────────────────────────────────────────┐\n│          👑 *KAIF-MD-V3 AUTOMATION*          │\n│            *VIP GLOBAL FORWARDER*             │\n└──────────────────────────────────────────────┘\n\n🔴 *AUTO-FORWARDING DISABLED*\n⚡ Routing paused.' 
+                text: '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n🔴 *INACTIVE*  ⚡ *PAUSED*' 
             }, { quoted: kaif_msg });
         }
 
         if (action === 'clear') {
             await kaif_updateGlobalAutoForward(sessionId, { enabled: false, sourceJids: [], targetJids: [] });
             return await sock.sendMessage(from, { 
-                text: '┌──────────────────────────────────────────────┐\n│          🧹 *CONFIG PURGED*                  │\n└──────────────────────────────────────────────┘\n\n🔴 All sources and destination targets cleared.' 
+                text: '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n🧹 *CONFIG PURGED*' 
             }, { quoted: kaif_msg });
         }
 
@@ -95,8 +95,8 @@ module.exports = {
                 const updated = action === 'add' ? [...new Set([...current, ...newJids])] : newJids;
                 await kaif_updateGlobalAutoForward(sessionId, { sourceJids: updated, enabled: true });
                 
-                let listStr = updated.length ? updated.map(j => '• `' + j + '`').join('\n') : '• 🌐 *All Incoming Chats (Global)*';
-                let text = '📥 *SOURCE CONFIGURATION* `' + String(updated.length).padStart(2, '0') + '`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' + listStr + '\n\n🟢 *Sources updated and active.*';
+                let listStr = updated.length ? updated.map(j => '`' + j + '`').join('\n') : '🌐 *All Chats (Global)*';
+                let text = '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n📥 *SOURCE*\n' + listStr + '\n\n🟢 *Active*';
                 return await sock.sendMessage(from, { text }, { quoted: kaif_msg });
             }
 
@@ -105,8 +105,8 @@ module.exports = {
                 const updated = action === 'add' ? [...new Set([...current, ...newJids])] : newJids;
                 await kaif_updateGlobalAutoForward(sessionId, { targetJids: updated, enabled: true });
                 
-                let listStr = updated.length ? updated.map(j => '• `' + j + '`').join('\n') : '• ⚠️ *No Destination Targets Set*';
-                let text = '📤 *DESTINATION CONFIGURATION* `' + String(updated.length).padStart(2, '0') + '`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' + listStr + '\n\n🟢 *Destinations updated and active.*';
+                let listStr = updated.length ? updated.map(j => '`' + j + '`').join('\n') : '⚠️ *No Targets Set*';
+                let text = '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n📤 *TARGET*\n' + listStr + '\n\n🟢 *Active*';
                 return await sock.sendMessage(from, { text }, { quoted: kaif_msg });
             }
 
@@ -115,8 +115,8 @@ module.exports = {
                 const updated = action === 'add' ? [...new Set([...current, ...newJids])] : newJids;
                 await kaif_updateGlobalAutoForward(sessionId, { targetJids: updated, enabled: true });
                 
-                let listStr = updated.map(j => '• `' + j + '`').join('\n');
-                let text = '📤 *DESTINATION CONFIGURATION* `' + String(updated.length).padStart(2, '0') + '`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' + listStr + '\n\n🟢 *Destinations updated and active.*';
+                let listStr = updated.map(j => '`' + j + '`').join('\n');
+                let text = '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n📤 *TARGET*\n' + listStr + '\n\n🟢 *Active*';
                 return await sock.sendMessage(from, { text }, { quoted: kaif_msg });
             }
         }
@@ -126,8 +126,8 @@ module.exports = {
             const sources = parseJids(rawVal);
             await kaif_updateGlobalAutoForward(sessionId, { sourceJids: sources, enabled: true });
             
-            let listStr = sources.length ? sources.map(j => '• `' + j + '`').join('\n') : '• 🌐 *All Incoming Chats (Global)*';
-            let text = '📥 *SOURCE CONFIGURATION* `' + String(sources.length).padStart(2, '0') + '`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' + listStr + '\n\n🟢 *Sources updated and active.*';
+            let listStr = sources.length ? sources.map(j => '`' + j + '`').join('\n') : '🌐 *All Chats (Global)*';
+            let text = '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n📥 *SOURCE*\n' + listStr + '\n\n🟢 *Active*';
             return await sock.sendMessage(from, { text }, { quoted: kaif_msg });
         }
 
@@ -136,8 +136,8 @@ module.exports = {
             const targets = parseJids(rawVal);
             await kaif_updateGlobalAutoForward(sessionId, { targetJids: targets, enabled: true });
             
-            let listStr = targets.length ? targets.map(j => '• `' + j + '`').join('\n') : '• ⚠️ *No Destination Targets Set*';
-            let text = '📤 *DESTINATION CONFIGURATION* `' + String(targets.length).padStart(2, '0') + '`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' + listStr + '\n\n🟢 *Destinations updated and active.*';
+            let listStr = targets.length ? targets.map(j => '`' + j + '`').join('\n') : '⚠️ *No Targets Set*';
+            let text = '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n📤 *TARGET*\n' + listStr + '\n\n🟢 *Active*';
             return await sock.sendMessage(from, { text }, { quoted: kaif_msg });
         }
 
@@ -163,65 +163,46 @@ module.exports = {
 
             await kaif_updateGlobalAutoForward(sessionId, { [dbField]: enable });
             return await sock.sendMessage(from, {
-                text: '🎬 *MEDIA ROUTING*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• *' + typeKey.toUpperCase() + '* → ' + (enable ? '🟢 *ENABLED*' : '🔴 *DISABLED*')
+                text: '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n🎬 *MEDIA*  ' + typeKey.toUpperCase() + ' → ' + (enable ? '*ON*' : '*OFF*')
             }, { quoted: kaif_msg });
         }
 
-        // EXACT USER REQUESTED VIP STATUS DASHBOARD
+        // COMPACT COMPACT VIP STATUS DASHBOARD (EXACT USER FORMAT)
         const isEnabled = !!globalCfg.enabled;
-        const statusStr = isEnabled ? '🟢 *Status*        : ACTIVE • Operational' : '🔴 *Status*        : INACTIVE • Paused';
+        const statusHeaderStr = isEnabled ? '🟢 *ACTIVE*  ⚡ *INSTANT DISPATCH*' : '🔴 *INACTIVE*  ⚡ *PAUSED*';
         const sources = globalCfg.sourceJids || [];
         const targets = globalCfg.targetJids || [];
 
-        const srcCountStr = String(sources.length).padStart(2, '0');
-        const tgtCountStr = String(targets.length).padStart(2, '0');
-        const activeRoutesStr = String(targets.length).padStart(2, '0') + (targets.length === 1 ? ' Destination' : ' Destinations');
-
         let sourceListStr = sources.length 
-            ? sources.map(j => '• `' + j + '`').join('\n')
-            : '• 🌐 *All Incoming Chats (Global)*';
+            ? sources.map(j => '`' + j + '`').join('\n')
+            : '🌐 *All Chats (Global)*';
 
         let targetListStr = targets.length 
-            ? targets.map(j => '• `' + j + '`').join('\n')
-            : '• ⚠️ *No Destination Targets Set*';
+            ? targets.map(j => '`' + j + '`').join('\n')
+            : '⚠️ *No Targets Set*';
 
-        let footerStatusStr = isEnabled 
-            ? '🟢 *SYSTEM OPERATIONAL*\n⚡ All routing protocols are active.\n👑 *KAIF-MD-V3 • VIP AUTOMATION SUITE*'
-            : '🔴 *SYSTEM PAUSED*\n⚡ Auto-forwarding disabled.\n👑 *KAIF-MD-V3 • VIP AUTOMATION SUITE*';
+        // Media Emojis Status
+        let mediaIcons = [];
+        if (globalCfg.forwardText !== false) mediaIcons.push('💬');
+        if (globalCfg.forwardPicture !== false) mediaIcons.push('🖼️');
+        if (globalCfg.forwardVideo !== false) mediaIcons.push('🎥');
+        if (globalCfg.forwardAudio !== false) mediaIcons.push('🎵');
+        if (globalCfg.forwardDocument !== false) mediaIcons.push('📄');
+
+        let mediaStr = mediaIcons.length > 0 ? mediaIcons.join(' ') + ' *ON*' : '🔴 *OFF*';
 
         let vipMenuText = 
-            '┌──────────────────────────────────────────────┐\n' +
-            '│          👑 *KAIF-MD-V3 AUTOMATION*          │\n' +
-            '│            *VIP GLOBAL FORWARDER*             │\n' +
-            '└──────────────────────────────────────────────┘\n\n' +
-            '📊 *SYSTEM ENGINE*\n' +
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
-            '⚡ *Engine*        : Instant Dispatch\n' +
-            statusStr + '\n' +
-            '🎯 *Active Routes* : ' + activeRoutesStr + '\n\n' +
-            '📥 *SOURCE CONFIGURATION* `' + srcCountStr + '`\n' +
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+            '👑 *KAIF-MD V3 • VIP FORWARDER*\n\n' +
+            statusHeaderStr + '\n\n' +
+            '📥 *SOURCE*\n' +
             sourceListStr + '\n\n' +
-            '📤 *DESTINATION CONFIGURATION* `' + tgtCountStr + '`\n' +
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+            '📤 *TARGET*\n' +
             targetListStr + '\n\n' +
-            '🎬 *MEDIA ROUTING*\n' +
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
-            '💬 Text Messages       → ' + (globalCfg.forwardText !== false ? '🟢 ENABLED' : '🔴 DISABLED') + '\n' +
-            '🖼️ Photos & Images     → ' + (globalCfg.forwardPicture !== false ? '🟢 ENABLED' : '🔴 DISABLED') + '\n' +
-            '🎥 Videos & Clips      → ' + (globalCfg.forwardVideo !== false ? '🟢 ENABLED' : '🔴 DISABLED') + '\n' +
-            '🎵 Audio & Voice       → ' + (globalCfg.forwardAudio !== false ? '🟢 ENABLED' : '🔴 DISABLED') + '\n' +
-            '📄 Documents & Files   → ' + (globalCfg.forwardDocument !== false ? '🟢 ENABLED' : '🔴 DISABLED') + '\n\n' +
-            '⚙️ *VIP CONTROL PANEL*\n' +
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
-            '`.af on`                 → Enable Forwarding\n' +
-            '`.af off`                → Disable Forwarding\n' +
-            '`.af source`             → Configure Sources\n' +
-            '`.af target`             → Configure Destinations\n' +
-            '`.af type [media] on/off`→ Manage Media Types\n' +
-            '`.af clear`              → Reset Configuration\n\n' +
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
-            footerStatusStr;
+            '🎬 *MEDIA*  ' + mediaStr + '\n\n' +
+            '⚙️ `.af on` • `.af off`\n' +
+            '`.af source` • `.af target`\n' +
+            '`.af type` • `.af clear`\n\n' +
+            '*⚡ VIP GLOBAL AUTOMATION*';
 
         return await sock.sendMessage(from, { text: vipMenuText }, { quoted: kaif_msg });
     }
