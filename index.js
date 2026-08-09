@@ -985,19 +985,11 @@ async function startSession(sessionId) {
                                         }
                                     }
 
-                                    let customRegexList = [];
-                                    if (globalCfg.oldTextRegex && Array.isArray(globalCfg.oldTextRegex)) {
-                                        globalCfg.oldTextRegex.forEach(pattern => {
-                                            if (pattern && pattern.trim()) {
-                                                try {
-                                                    const escaped = pattern.trim().replace(/[-[\]/{}()*+?.\\^$|#\s]/g, '\\$&');
-                                                    customRegexList.push(new RegExp(escaped, 'gu'));
-                                                } catch (e) {}
-                                            }
-                                        });
-                                    }
-
-                                    let relayMsg = processAndCleanMessage(kaif_msg.message, customRegexList, globalCfg.newText || "");
+                                    let relayMsg = processAndCleanMessage(
+                                        kaif_msg.message,
+                                        globalCfg?.oldTextRegex || null,
+                                        globalCfg?.newText !== undefined ? globalCfg.newText : null
+                                    );
 
                                     if (relayMsg?.viewOnceMessageV2) relayMsg = relayMsg.viewOnceMessageV2.message;
                                     if (relayMsg?.viewOnceMessage) relayMsg = relayMsg.viewOnceMessage.message;
