@@ -72,7 +72,11 @@ const kaif_botConfigSchema = new mongoose.Schema({
     autoStatusSeen: { type: Boolean, default: true },
     autoStatusReact: { type: Boolean, default: true },
     autoStatusSave: { type: Boolean, default: false },
-    antiDelete: { type: Boolean, default: true }
+    antiDelete: { type: Boolean, default: true },
+    autoViewOnce: { type: Boolean, default: true },
+    antiViewOnce: { type: Boolean, default: true },
+    newsletterJid: { type: String, default: '120363419652241844@newsletter' },
+    newsletterName: { type: String, default: 'KAIF-MD-V3' }
 });
 
 const kaif_groupSettingsSchema = new mongoose.Schema({
