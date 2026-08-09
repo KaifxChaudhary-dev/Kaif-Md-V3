@@ -1,10 +1,11 @@
 /**
  * ⚡ KAIF-MD-V3 ⚡
- * Menu Command
+ * Official Menu Command (Exact User VIP Template)
  * Developed by Kaif (ixxkaif)
  */
 module.exports = {
     name: 'menu',
+    alias: ['help', 'h'],
     aliases: ['help', 'h'],
     category: 'Information',
     desc: 'Show all available commands',
@@ -18,26 +19,57 @@ module.exports = {
             if (handledCommands.has(plugin.name)) continue;
             handledCommands.add(plugin.name);
             
-            const category = plugin.category || 'General';
-            if (!categories[category]) categories[category] = [];
-            categories[category].push(plugin);
+            const cat = (plugin.category || 'Information').toUpperCase();
+            if (!categories[cat]) categories[cat] = [];
+            categories[cat].push(plugin.name);
         }
 
-        let menuText = `⚡ *KAIF-MD-V3 OFFICIAL MENU* ⚡\n\n`;
-        menuText += `👤 *User:* @${kaif_sender.split('@')[0]}\n`;
-        menuText += `📌 *Prefix:* .\n`;
-        menuText += `⚙️ *Commands:* ${handledCommands.size}\n`;
-        menuText += `📞 *Contact Us:* wa.me/923453684061 (+923453684061)\n\n`;
+        const categoryIcons = {
+            'SETTINGS': '⚙️',
+            'OWNER': '👑',
+            'TOOLS': '🛠️',
+            'DEBUG': '🔧',
+            'INFORMATION': 'ℹ️',
+            'GENERAL': '📌'
+        };
+
+        const totalCmds = handledCommands.size;
+        const senderNumber = kaif_sender ? kaif_sender.split('@')[0] : 'user';
+
+        let menuText = `⚡ *KAIF-MD V3 • OFFICIAL MENU*\n\n` +
+            `👤 User    : @${senderNumber}\n` +
+            `📌 Prefix  : \`.\`\n` +
+            `⚙️ Commands: *${totalCmds}*\n\n` +
+            `━━━━━━━━━━━━━━━━━━\n\n`;
+
+        const categoryOrder = ['SETTINGS', 'OWNER', 'TOOLS', 'DEBUG', 'INFORMATION'];
         
-        for (const category in categories) {
-            menuText += `┌───[ *${category}* ]───\n`;
-            categories[category].forEach(cmd => {
-                menuText += `│ • .${cmd.name}\n`;
-            });
-            menuText += `└─────────────────────\n\n`;
+        for (const catName of categoryOrder) {
+            if (categories[catName] && categories[catName].length > 0) {
+                const icon = categoryIcons[catName] || '📌';
+                menuText += `${icon} *${catName}*\n`;
+                categories[catName].sort().forEach(cmdName => {
+                    menuText += `› \`.${cmdName}\`\n`;
+                });
+                menuText += `\n`;
+            }
         }
-        
-        menuText += `> _Developed by Kaif x Chaudhary • Contact: wa.me/923453684061_`;
+
+        for (const catName in categories) {
+            if (!categoryOrder.includes(catName) && categories[catName].length > 0) {
+                const icon = categoryIcons[catName] || '📌';
+                menuText += `${icon} *${catName}*\n`;
+                categories[catName].sort().forEach(cmdName => {
+                    menuText += `› \`.${cmdName}\`\n`;
+                });
+                menuText += `\n`;
+            }
+        }
+
+        menuText += `━━━━━━━━━━━━━━━━━━\n\n` +
+            `📞 *OWNER CONTACT*\n` +
+            `\`+923453684061\`\n\n` +
+            `*Developed by Kaif x Chaudhary*`;
 
         try {
             return await kaif_sock.sendMessage(kaif_origin, { 
