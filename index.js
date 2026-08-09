@@ -390,34 +390,23 @@ function kaif_loadPlugins() {
     const pluginDir = path.join(__dirname, 'kaifplugins');
     if (!fs.existsSync(pluginDir)) return;
 
-    const requested = [
-        'autoforward.js',
-        'forward.js',
-        'gjids.js',
-        'jid.js',
-        'uptime.js',
-        'ping.js',
-        'menu.js',
-        'antidelete.js',
-        'autostatus.js',
-        'owner.js'
-    ];
+    const files = fs.readdirSync(pluginDir).filter(f => f.endsWith('.js'));
     
-    for (const file of requested) {
-        const filePath = path.join(pluginDir, file);
-        if (fs.existsSync(filePath)) {
-            try {
-                const plugin = require(`./kaifplugins/${file}`);
-                if (plugin.name) {
-                    const name = plugin.name.toLowerCase();
-                    kaif_plugins.set(name, plugin);
-                    if (plugin.aliases && Array.isArray(plugin.aliases)) {
-                        plugin.aliases.forEach(alias => kaif_plugins.set(alias.toLowerCase(), plugin));
-                    }
+    for (const file of files) {
+        try {
+            const relPath = './kaifplugins/' + file;
+            delete require.cache[require.resolve(relPath)];
+            const plugin = require(relPath);
+            if (plugin && plugin.name) {
+                const name = plugin.name.toLowerCase();
+                kaif_plugins.set(name, plugin);
+                const aliases = plugin.aliases || plugin.alias;
+                if (aliases && Array.isArray(aliases)) {
+                    aliases.forEach(a => kaif_plugins.set(a.toLowerCase(), plugin));
                 }
-            } catch (e) {
-                console.error(`Failed to load plugin ${file}:`, e.message);
             }
+        } catch (e) {
+            console.error(`Failed to load plugin ${file}:`, e.message);
         }
     }
     console.log(`✅ Loaded ${kaif_plugins.size} core commands.`);

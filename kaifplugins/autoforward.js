@@ -43,6 +43,7 @@ function parseJids(rawText) {
 module.exports = {
     name: 'autoforward',
     alias: ['af', 'globalaf', 'autofwd'],
+    aliases: ['af', 'globalaf', 'autofwd'],
     desc: 'VIP Fast Global Auto-Forwarding Suite',
     category: 'owner',
 
