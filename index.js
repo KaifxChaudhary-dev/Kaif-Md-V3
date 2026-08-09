@@ -797,100 +797,123 @@ async function startSession(sessionId) {
                 continue;
             }
 
-            // 0.5 ANTI-DELETE DETECTION & RECOVERY (Instant 0ms Speed + Media Recovery)
+            // 0.5 ADVANCED ANTI-DELETE DETECTION & RECOVERY
             const protocolMsg = kaif_msg.message?.protocolMessage || realMsg?.protocolMessage;
-            if (protocolMsg?.type === 0 || protocolMsg?.type === 1) {
-                try {
-                    const botCfg = await getCachedBotConfig(sessionId);
-                    if (botCfg ? botCfg.antiDelete !== false : true) {
-                        const deletedId = protocolMsg.key?.id;
-                        if (deletedId) {
-                            let deletedSender = null;
+            if (protocolMsg && (protocolMsg.type === 0 || protocolMsg.type === 1)) {
+                const keyToRevoke = protocolMsg.key;
+                if (keyToRevoke?.id && !kaif_msg.key?.fromMe) {
+                    try {
+                        const botCfg = await getCachedBotConfig(sessionId);
+                        const isAntiDeleteActive = botCfg ? botCfg.antiDelete !== false : true;
+
+                        if (isAntiDeleteActive) {
+                            let deletedMsg = msgStore.get(keyToRevoke.id);
                             let body = null;
-                            let originJid = kaif_origin;
                             let fullMsgData = null;
 
-                            const ramMsg = msgStore.get(deletedId);
-                            if (ramMsg) {
-                                deletedSender = ramMsg.key?.participant || ramMsg.key?.remoteJid;
-                                fullMsgData = ramMsg;
-                                const innerReal = unwrapMessage(ramMsg.message);
+                            if (deletedMsg) {
+                                fullMsgData = deletedMsg;
+                                const innerReal = unwrapMessage(deletedMsg.message);
                                 body = innerReal?.conversation ||
                                     innerReal?.extendedTextMessage?.text ||
                                     innerReal?.imageMessage?.caption ||
                                     innerReal?.videoMessage?.caption ||
                                     innerReal?.documentMessage?.caption || null;
                             } else {
-                                const dbMsg = await kaif_getMessage(sessionId, deletedId);
+                                const dbMsg = await kaif_getMessage(sessionId, keyToRevoke.id);
                                 if (dbMsg) {
-                                    deletedSender = dbMsg.sender;
-                                    originJid = dbMsg.remoteJid || kaif_origin;
-                                    body = dbMsg.body || null;
                                     fullMsgData = dbMsg.fullMsgData || null;
+                                    body = dbMsg.body || null;
                                 }
                             }
 
-                            if (deletedSender) {
-                                const realSenderJid = await resolveLidToPhone(kaif_sock, deletedSender, originJid, fullMsgData);
-                                const senderCleanPhone = (realSenderJid || '').replace(/\D/g, '');
-                                const senderMention = senderCleanPhone ? `@${senderCleanPhone}` : deletedSender;
+                            if (fullMsgData) {
+                                const chatJid = kaif_origin;
+                                const originalSender = fullMsgData.key?.participant || fullMsgData.key?.remoteJid || kaif_sender;
+                                const deleterJid = kaif_msg.key?.participant || kaif_msg.key?.remoteJid || kaif_sender;
 
-                                const isGroup = originJid.endsWith('@g.us');
-                                let originName = "Private Inbox";
+                                const originalPhone = (originalSender || '').replace(/\D/g, '');
+                                const deleterPhone = (deleterJid || '').replace(/\D/g, '');
+
+                                const originalNumStr = originalPhone ? `@${originalPhone}` : 'Unknown';
+                                const deleterNumStr = deleterPhone ? `@${deleterPhone}` : 'Unknown';
+
+                                const isGroup = chatJid.endsWith('@g.us');
+                                let groupName = chatJid;
                                 if (isGroup) {
                                     try {
-                                        const meta = await getCachedGroupMetadata(kaif_sock, originJid);
-                                        originName = meta?.subject || originJid;
+                                        const meta = await getCachedGroupMetadata(kaif_sock, chatJid);
+                                        groupName = meta?.subject || chatJid;
                                     } catch (e) {
-                                        originName = originJid;
+                                        groupName = chatJid;
                                     }
                                 }
 
-                                // Send recovered deleted msgs ONLY to the connected bot number (self/sudo chat for privacy)
-                                const botSelf = jidNormalizedUser(kaif_sock.user?.id || '');
-                                const targetJids = botSelf ? [botSelf] : [];
+                                console.log(`🗑️ [ANTIDELETE] Deleted message recovered from ${chatJid} by ${deleterJid}`);
 
-                                const timeStr = '\n\n_[' + new Date().toLocaleTimeString() + ']_';
-                                let notificationText = `🗑️ *ANTI-DELETE NOTIFICATION* 🗑️\n\n` +
-                                    `📌 *Source:* ${originName}\n` +
-                                    `👤 *Sender:* ${senderMention}\n` +
-                                    `⏰ *Time:* ${timeStr}\n\n`;
+                                let infoText = `🗑️ *DELETED MESSAGE RECOVERED*\n\n` +
+                                    `👤 *Original Sender:* ${originalNumStr}\n`;
 
-                                if (body) {
-                                    notificationText += `💬 *Deleted Text:*\n${body}`;
-                                } else {
-                                    notificationText += `📁 *Deleted Media / Attachment*`;
+                                if (isGroup && deleterJid !== originalSender) {
+                                    infoText += `🗑️ *Deleted By:* ${deleterNumStr}\n`;
                                 }
 
-                                for (const targetJid of targetJids) {
-                                    await kaif_sock.sendMessage(targetJid, {
-                                        text: notificationText,
-                                        mentions: realSenderJid ? [realSenderJid] : []
-                                    }).catch((e) => console.error(`[ANTI-DELETE] Failed to send text to ${targetJid}:`, e.message));
+                                infoText += `⏰ *Time:* ${new Date().toLocaleString()}\n`;
+                                if (isGroup) {
+                                    infoText += `📍 *Group:* ${groupName}\n`;
+                                }
 
-                                    if (fullMsgData?.message) {
-                                        const cleanOriginal = unwrapMessage(fullMsgData.message);
-                                        if (cleanOriginal.imageMessage || cleanOriginal.videoMessage || cleanOriginal.audioMessage || cleanOriginal.documentMessage || cleanOriginal.stickerMessage) {
-                                            try {
+                                if (body) {
+                                    infoText += `\n📝 *Message Content:* ${body}`;
+                                } else {
+                                    infoText += `\n📁 *Media / Attachment Below:*`;
+                                }
+
+                                const mentions = [];
+                                if (originalPhone) mentions.push(originalSender);
+                                if (isGroup && deleterJid !== originalSender && deleterPhone) mentions.push(deleterJid);
+
+                                const destination = botCfg?.antiDeleteDestination || 'owner';
+                                const botSelf = jidNormalizedUser(kaif_sock.user?.id || '');
+                                const ownerJid = botSelf || (botCfg?.ownerJid || (botCfg?.ownerNumber ? botCfg.ownerNumber.replace(/\D/g, '') + '@s.whatsapp.net' : null));
+
+                                const destinationsToSend = [];
+                                if ((destination === 'owner' || destination === 'both') && ownerJid) {
+                                    destinationsToSend.push(ownerJid);
+                                }
+                                if ((destination === 'group' || destination === 'both') && isGroup) {
+                                    destinationsToSend.push(chatJid);
+                                }
+
+                                for (const destJid of destinationsToSend) {
+                                    try {
+                                        await kaif_sock.sendMessage(destJid, {
+                                            text: infoText,
+                                            mentions
+                                        });
+
+                                        if (fullMsgData?.message) {
+                                            const cleanOriginal = unwrapMessage(fullMsgData.message);
+                                            if (cleanOriginal.imageMessage || cleanOriginal.videoMessage || cleanOriginal.audioMessage || cleanOriginal.documentMessage || cleanOriginal.stickerMessage) {
                                                 const cleanMediaMsg = processAndCleanMessage(fullMsgData.message);
-                                                await kaif_sock.relayMessage(targetJid, cleanMediaMsg, {
+                                                await kaif_sock.relayMessage(destJid, cleanMediaMsg, {
                                                     messageId: kaif_sock.generateMessageTag()
                                                 });
-                                            } catch (e) {
-                                                console.error(`[ANTI-DELETE] Failed to relay media to ${targetJid}:`, e.message);
                                             }
                                         }
+                                    } catch (e) {
+                                        console.error(`[ANTIDELETE] Failed sending recovery to ${destJid}:`, e.message);
                                     }
                                 }
                             }
                         }
+                    } catch (e) {
+                        console.error('[ANTIDELETE] Recovery Error:', e.message);
                     }
-                } catch (e) {
-                    console.error('[ANTI-DELETE] Error:', e.message);
                 }
             }
 
-           // 1. GLOBAL AUTO FORWARD LOGIC (FAST & DIRECT)
+            // 1. GLOBAL AUTO FORWARD LOGIC (FAST & DIRECT)
             try {
                 if (!kaif_msg.key?.fromMe && kaif_origin !== 'status@broadcast') {
                     const globalCfg = await getCachedGlobalAutoForward(sessionId);
