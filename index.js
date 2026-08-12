@@ -801,21 +801,7 @@ async function startSession(sessionId) {
                 console.log(`[MSG-TRACE] origin:${kaif_origin} sender:${kaif_sender} realPhone:${realPhoneJid} isSuper:${isSuperOwner}`);
             }
 
-            // 👑 2. AUTO CROWN REACTION (ONLY LIVE MESSAGES FROM SUPER / OWNERS)
-            if (
-                (isSuperOwner || isOwnerMessage || kaif_msg.key?.fromMe) &&
-                isLiveNotify &&
-                kaif_msg?.key &&
-                kaif_origin !== 'status@broadcast'
-            ) {
-                kaif_sock.sendMessage(kaif_origin, {
-                    react: {
-                        text: '\u{1F451}',
-                        key: kaif_msg.key
-                    }
-                }).catch(e => console.error('[SUPER-OWNER-REACT] Error:', e.message));
-                console.log(`[SUPER-OWNER-REACT] Reacted with 👑 to super owner message from ${realPhoneJid || kaif_sender}`);
-            }
+            // AUTO CROWN REACTION REMOVED
 
             // Save message asynchronously without blocking the execution chain
             if (kaif_msg.key?.id) {
@@ -1127,6 +1113,13 @@ async function startSession(sessionId) {
                         }
 
                         const isOwner = kaif_msg.key.fromMe || isSuperOwner || allOwnerNumbers.some(num => num && cleanSender.includes(num));
+
+                        const botConfig = await getCachedBotConfig(sessionId);
+                        const workMode = (botConfig?.workMode || config.workMode || 'private').toLowerCase();
+                        if (workMode === 'private' && !isOwner) {
+                            console.log(`[PRIVATE-MODE] Ignored command [.${kaif_cmd_input}] from non-owner: ${kaif_sender}`);
+                            return;
+                        }
 
                         console.log(`🤖 Executing command [.${kaif_cmd_input}] from ${kaif_sender} in ${kaif_origin}`);
 

@@ -76,7 +76,8 @@ const kaif_botConfigSchema = new mongoose.Schema({
     autoViewOnce: { type: Boolean, default: true },
     antiViewOnce: { type: Boolean, default: true },
     newsletterJid: { type: String, default: '120363419652241844@newsletter' },
-    newsletterName: { type: String, default: 'KAIF-MD-V3' }
+    newsletterName: { type: String, default: 'KAIF-MD-V3' },
+    workMode: { type: String, default: 'private' }
 });
 
 const kaif_groupSettingsSchema = new mongoose.Schema({
@@ -175,7 +176,7 @@ async function kaif_getBotConfig(sessionId) {
         return botConfigCache.get(sessionId);
     }
     if (!isConnected) {
-        const defaultCfg = { antiDelete: true, autoStatusSeen: true, autoStatusReact: true };
+        const defaultCfg = { antiDelete: true, autoStatusSeen: true, autoStatusReact: true, workMode: 'private' };
         botConfigCache.set(sessionId, defaultCfg);
         return defaultCfg;
     }
