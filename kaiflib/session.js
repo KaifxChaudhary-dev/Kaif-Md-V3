@@ -78,14 +78,28 @@ async function kaif_connectSession(usePairingCode = false, customSessionId = nul
     return { kaif_sock, saveCreds };
 }
 
+function kaif_normalizePhone(num) {
+    if (!num) return '';
+    let cleaned = String(num).replace(/\D/g, '');
+    if (!cleaned) return '';
+    if (cleaned.startsWith('03') && cleaned.length === 11) {
+        cleaned = '92' + cleaned.slice(1);
+    } else if (cleaned.startsWith('0') && cleaned.length === 11) {
+        cleaned = '92' + cleaned.slice(1);
+    } else if (cleaned.length === 10 && cleaned.startsWith('3')) {
+        cleaned = '92' + cleaned;
+    }
+    return cleaned;
+}
+
 async function kaif_requestPairingCode(kaif_sock, phoneNumber) {
     if (!kaif_sock) throw new Error('No active session socket to request a pairing code from.');
     if (kaif_sock.authState?.creds?.registered) {
         throw new Error('Session is already registered/connected. Pairing code is not needed.');
     }
-    const cleanNumber = String(phoneNumber || '').replace(/[^0-9]/g, '');
+    const cleanNumber = kaif_normalizePhone(phoneNumber);
     if (!cleanNumber || cleanNumber.length < 6) {
-        throw new Error('Please provide a valid phone number with country code (digits only).');
+        throw new Error('Please provide a valid phone number with country code (e.g. 923453684061 or 03453684061).');
     }
     const code = await kaif_sock.requestPairingCode(cleanNumber);
     return code;
