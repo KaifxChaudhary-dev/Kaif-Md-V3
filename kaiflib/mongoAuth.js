@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const { BufferJSON, initAuthCreds } = require('@whiskeysockets/baileys');
 
 // Define Schema for Auth with bufferCommands: false to prevent process crash if DB disconnects
@@ -11,10 +11,10 @@ const AuthStateSchema = new mongoose.Schema({
     autoCreate: true
 });
 
-// Fast In-Memory Cache for 0ms Auth Key Access
-const keyCache = new Map();
-
 const useMongoDBAuthState = async (sessionId = 'kaif_session') => {
+    // Fast In-Memory Cache for 0ms Auth Key Access (Instance Scoped)
+    const keyCache = new Map();
+
     if (mongoose.connection.readyState !== 1) {
         let waitCount = 0;
         while (mongoose.connection.readyState !== 1 && waitCount < 10) {
@@ -56,9 +56,12 @@ const useMongoDBAuthState = async (sessionId = 'kaif_session') => {
             if (mongoose.connection.readyState !== 1) return null;
             const result = await AuthState.findById(id);
             if (result && result.data) {
-                let parsed = result.data;
+                let parsed;
                 if (typeof result.data === 'string') {
                     parsed = JSON.parse(result.data, BufferJSON.reviver);
+                } else {
+                    const stringified = JSON.stringify(result.data, BufferJSON.replacer);
+                    parsed = JSON.parse(stringified, BufferJSON.reviver);
                 }
                 keyCache.set(id, parsed);
                 return parsed;

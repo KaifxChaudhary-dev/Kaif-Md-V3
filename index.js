@@ -712,12 +712,13 @@ async function startSession(sessionId) {
             sessionState.pairingCode = null;
             const statusCode = (lastDisconnect?.error instanceof Boom) ?
                 lastDisconnect.error.output.statusCode : 500;
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 440;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-            console.log(`Session ${sessionId}: Connection closed, reconnecting: ${shouldReconnect}`);
+            console.log(`Session ${sessionId}: Connection closed (status: ${statusCode}), reconnecting: ${shouldReconnect}`);
             if (shouldReconnect) {
                 setTimeout(() => startSession(sessionId), 3000);
             } else {
+                console.log(`Session ${sessionId}: Logged out by WhatsApp (status: ${statusCode}). Clearing session.`);
                 sessions.delete(sessionId);
                 await kaif_clearSession(sessionId);
             }
