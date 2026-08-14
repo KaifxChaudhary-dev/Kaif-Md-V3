@@ -1113,7 +1113,7 @@ async function startSession(sessionId) {
                             } catch (e) { }
                         }
 
-                        const isOwner = kaif_msg.key.fromMe || isSuperOwner || allOwnerNumbers.some(num => num && cleanSender.includes(num));
+                        const isOwner = kaif_msg.key.fromMe || isSuperOwner || isOwnerMessage;
 
                         const botConfig = await getCachedBotConfig(sessionId);
                         const workMode = (botConfig?.workMode || config.workMode || 'private').toLowerCase();
@@ -1138,7 +1138,12 @@ async function startSession(sessionId) {
                             kaif_plugins
                         });
                     } catch (err) {
-                        console.error(`Error in plugin ${kaif_cmd_input}:`, err.message);
+                        console.error(`Error executing plugin .${kaif_cmd_input}:`, err.stack || err.message);
+                        try {
+                            await kaif_sock.sendMessage(kaif_origin, {
+                                text: `❌ *Command Error (.${kaif_cmd_input}):* ${err.message || 'An error occurred.'}`
+                            });
+                        } catch (sendErr) {}
                     }
                 }
             }
