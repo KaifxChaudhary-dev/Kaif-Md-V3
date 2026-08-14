@@ -15,12 +15,8 @@
     "baileys",
     "nodejs"
   ],
-  "author": "Kaif (@KaifxChaudhary-dev)",
+  "author": "Kaif",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/KaifxChaudhary-dev.git"
-  },
   "engines": {
     "node": "20.x"
   },

@@ -7,7 +7,6 @@
     "kaif",
     "mongodb"
   ],
-  "repository": "https://github.com/KaifxChaudhary-dev/Kaif-Md",
   "logo": "https://i.ibb.co/d6bLQ7y/whatsapp-logo.png",
   "success_url": "/",
   "stack": "heroku-24",

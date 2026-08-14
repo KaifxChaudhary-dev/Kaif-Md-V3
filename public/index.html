@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -444,7 +444,7 @@
                         <span class="toggle-desc">Detect & re-send deleted messages automatically</span>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" id="antiDeleteToggle">
+                        <input type="checkbox" id="antiDeleteToggle" onchange="saveConfig(true)">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -455,7 +455,7 @@
                         <span class="toggle-desc">Automatically view contact statuses</span>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" id="autoStatusSeenToggle">
+                        <input type="checkbox" id="autoStatusSeenToggle" onchange="saveConfig(true)">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -463,10 +463,10 @@
                 <div class="toggle-item">
                     <div class="toggle-info">
                         <span class="toggle-name"><i class="fas fa-heart" style="color: #ef4444;"></i> Auto Status React</span>
-                        <span class="toggle-desc">Automatically react with ❤️ to status updates</span>
+                        <span class="toggle-desc">Automatically react with ?? to status updates</span>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" id="autoStatusReactToggle">
+                        <input type="checkbox" id="autoStatusReactToggle" onchange="saveConfig(true)">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -477,7 +477,7 @@
                         <span class="toggle-desc">Enable background auto-forwarding between chats</span>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" id="autoForwardToggle">
+                        <input type="checkbox" id="autoForwardToggle" onchange="saveConfig(true)">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -494,7 +494,7 @@
                             <span class="toggle-name"><i class="fas fa-image" style="color: #3b82f6;"></i> Pictures</span>
                         </div>
                         <label class="switch">
-                            <input type="checkbox" id="fwdPictureToggle" checked>
+                            <input type="checkbox" id="fwdPictureToggle" checked onchange="saveConfig(true)">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -503,7 +503,7 @@
                             <span class="toggle-name"><i class="fas fa-video" style="color: #ef4444;"></i> Videos</span>
                         </div>
                         <label class="switch">
-                            <input type="checkbox" id="fwdVideoToggle" checked>
+                            <input type="checkbox" id="fwdVideoToggle" checked onchange="saveConfig(true)">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -512,7 +512,7 @@
                             <span class="toggle-name"><i class="fas fa-music" style="color: #10b981;"></i> Audios</span>
                         </div>
                         <label class="switch">
-                            <input type="checkbox" id="fwdAudioToggle" checked>
+                            <input type="checkbox" id="fwdAudioToggle" checked onchange="saveConfig(true)">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -521,7 +521,7 @@
                             <span class="toggle-name"><i class="fas fa-file-lines" style="color: #f59e0b;"></i> Documents</span>
                         </div>
                         <label class="switch">
-                            <input type="checkbox" id="fwdDocumentToggle" checked>
+                            <input type="checkbox" id="fwdDocumentToggle" checked onchange="saveConfig(true)">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -530,7 +530,7 @@
                             <span class="toggle-name"><i class="fas fa-comment-dots" style="color: #8b5cf6;"></i> Text</span>
                         </div>
                         <label class="switch">
-                            <input type="checkbox" id="fwdTextToggle" checked>
+                            <input type="checkbox" id="fwdTextToggle" checked onchange="saveConfig(true)">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -584,7 +584,7 @@
             </div>
 
             <div class="footer">
-                <p>Made with ❤️ by <a href="https://github.com/KaifxChaudhary-dev" target="_blank">Kaif-Md-V3</a></p>
+                <p>Made with ?? by <strong>Kaif-Md-V3</strong></p>
             </div>
         </div>
     </div>
@@ -610,13 +610,15 @@
                 document.getElementById('targetJids').value = data.targetJids?.join(', ') || '';
                 document.getElementById('oldTextRegex').value = data.oldTextRegex?.join(', ') || '';
                 document.getElementById('newText').value = data.newText || '';
-                console.log('✅ Configuration loaded');
+                console.log('? Configuration loaded');
             } catch (e) {
                 console.error('Failed to load config:', e);
             }
         }
 
-        async function saveConfig() {
+        async function saveConfig(isToggle = false) {
+            if (isSavingConfig) return;
+            isSavingConfig = true;
             const antiDelete = document.getElementById('antiDeleteToggle').checked;
             const autoStatusSeen = document.getElementById('autoStatusSeenToggle').checked;
             const autoStatusReact = document.getElementById('autoStatusReactToggle').checked;
@@ -658,8 +660,11 @@
 
                 const data = await res.json();
                 if (data.success) {
-                    msgDiv.innerHTML = '<span style="color: #25d366; background: rgba(37,211,102,0.1); padding: 8px 16px; border-radius: 100px; display: inline-block;"><i class="fas fa-circle-check"></i> Settings Saved!</span>';
-                    setTimeout(() => { msgDiv.innerHTML = ''; }, 3000);
+                    msgDiv.innerHTML = `<span style="color: #25d366; background: rgba(37,211,102,0.1); padding: 8px 16px; border-radius: 100px; display: inline-block;"><i class="fas fa-circle-check"></i> ${isToggle ? 'Toggle Updated!' : 'Settings Saved!'}</span>`;
+                    setTimeout(() => { msgDiv.innerHTML = ''; }, 2500);
+            } finally {
+                isSavingConfig = false;
+            }
                 } else {
                     msgDiv.innerHTML = '<span style="color: #ff4d4d;"><i class="fas fa-circle-exclamation"></i> Save failed</span>';
                 }
@@ -873,7 +878,7 @@
         loadConfig();
         checkStatus();
         setInterval(checkStatus, 3000);
-        setInterval(() => loadConfig(false), 5000);
+        // Periodic polling removed to prevent input overwrite
     
         // Live SSE Log Stream Reader with Auto-Reconnect
         function initLogStream() {
@@ -960,3 +965,4 @@
     </script>
 </body>
 </html>
+

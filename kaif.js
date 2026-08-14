@@ -69,6 +69,6 @@ module.exports = {
     superOwners: superOwnerList,
     ownerContact: 'wa.me/923453684061',
     channelUrl: 'https://whatsapp.com/channel/0029VbDMt1C3rZZaigDWAj1X',
-    githubUrl: 'https://github.com/KaifxChaudhary-dev',
+    githubUrl: '',
     workMode: process.env.WORKTYPE || process.env.WORK_MODE || 'private'
 };
