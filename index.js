@@ -718,9 +718,8 @@ async function startSession(sessionId) {
             if (shouldReconnect) {
                 setTimeout(() => startSession(sessionId), 3000);
             } else {
-                console.log(`Session ${sessionId}: Logged out by WhatsApp (status: ${statusCode}). Clearing session.`);
+                console.log(`Session ${sessionId}: Disconnected/Logged out by WhatsApp (status: ${statusCode}). Session retained in MongoDB.`);
                 sessions.delete(sessionId);
-                await kaif_clearSession(sessionId);
             }
         } else if (connection === 'open') {
             sessionState.isConnected = true;
